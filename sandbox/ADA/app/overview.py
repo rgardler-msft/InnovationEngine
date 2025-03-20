@@ -1,0 +1,58 @@
+import os
+import ui
+
+from base_object import BaseObject
+
+class Overview(BaseObject):
+    """
+    Overview class represents the overview of a document. It summarizes the content and provides a high-level view of the document.
+
+    The overview should be concise and informative, giving the reader a clear understanding of the main points and structure of the document.
+
+    The overview is the first part of the document to be created and is used to inform the generation of detail sections. It is critical that the overview is accurate and well-structured, as it sets the tone for the rest of the document.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def get_prompt(self, document, auto = False):
+        """
+        Returns the user prompt for the overview of a document.
+        """
+        content = f"# {document.title}\n\n"
+        for section in document.sections:
+            content += section.content
+
+        if not auto:
+            prompt = ui.get_user_input(f"Describe the desired content of the document titled '{document.title}'.\n")
+        else:
+            prompt = "Complete the overview of the document below:"
+
+        prompt += "\n\nCurrent content of the document:\n\n " + content
+        return prompt
+
+if __name__ == "__main__":
+    import ui
+
+    ui.title("Testing Overview class...")
+    
+    ui.title("Create an empty Overview")
+    overview = Overview()
+    ui.title("Populate the Overview")
+    overview.generate(True)
+    overview.display()
+
+    ui.title("Saving Overview to JSON file...")
+    overview.save("test.json")
+
+    ui.title("Loading overview from JSON file...")
+    loaded_overview = Overview.load("test.json")
+
+    assert overview.meta_data == loaded_overview.meta_data
+    assert overview.content == loaded_overview.content
+
+    ui.print_green("Loaded Overview matches the original.")
+    
+    ui.info("Deleting test.json...")
+    os.remove("test.json")
+    ui.info("Done.")
