@@ -19,7 +19,7 @@ endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
 model_name = os.getenv("AZURE_OPENAI_MODEL_NAME")
 deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT")
 subscription_key = os.getenv("AZURE_OPENAI_API_KEY")
-api_version = "2024-12-01-preview"
+api_version = os.getenv("AZURE_OPENAI_API_VERSION")
 
 client = AzureOpenAI(
     api_version=api_version,
@@ -86,11 +86,16 @@ def send_message(messages, is_streaming=True):
 if __name__ == "__main__":
     print ("Testing LLM...")
 
+    print(f"End point: {endpoint}")
+    print(f"Model name: {model_name}")
+    print(f"Deployment: {deployment}")
+    print(f"API version: {api_version}")
+
     messages = []
     messages.append(get_system_message_from_string("You re a grumpy agent in the style of Marvin the Paranoid Android."))
     messages.append({
         "role": "user", 
-        "content": "Say Hello."
+        "content": "Is the moon made of cheese?."
     })
     
     print ("Sending message...")

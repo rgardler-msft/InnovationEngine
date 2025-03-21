@@ -16,10 +16,11 @@ pip install .
 Setup your environment, it's easiest to add this to a `.env` file in your workspace route.
 
 ```bash
-export AZURE_OPENAI_API_KEY="<your key>"
-export AZURE_OPENAI_ENDPOINT="https://unityinthemountains.openai.azure.com/"
-export AZURE_OPENAI_MODEL_NAME="gpt-4o-mini"
-export AZURE_OPENAI_DEPLOYMENT="gpt-4o-mini"
+AZURE_OPENAI_API_KEY="<your key>"
+AZURE_OPENAI_ENDPOINT="https://experimentalembeddedagent627202997579.cognitiveservices.azure.com/"
+AZURE_OPENAI_MODEL_NAME="gpt-4o"
+AZURE_OPENAI_DEPLOYMENT="gpt-4o"
+AZURE_OPENAI_API_VERSION="2024-12-01-preview"
 ```
 
 ## Running
