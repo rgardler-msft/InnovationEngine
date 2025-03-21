@@ -31,13 +31,17 @@ class Summary(BaseObject):
     
 if __name__ == "__main__":
     import ui
+    from document import Document
 
     ui.title("Testing Summary class...")
     
     ui.title("Create an empty Summary")
+    document = Document()
+    document.title = "Test Document"
+
     summary = Summary()
     ui.title("Populate the OverSummaryview")
-    summary.generate(True)
+    summary.generate(document, True)
     summary.display()
 
     ui.title("Saving Summary to JSON file...")

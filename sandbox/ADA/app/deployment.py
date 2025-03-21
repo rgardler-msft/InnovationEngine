@@ -34,19 +34,23 @@ class Deployment(BaseObject):
 
 if __name__ == "__main__":
     import ui
+    from document import Document
 
     ui.title("Testing Deployment class...")
     
-    ui.title("Create an empty Deployment")
+    ui.info("Create an empty Deployment")
+    document = Document()
+    document.title = "Test Document"
+    
     deployment = Deployment()
-    ui.title("Populate the Deployment")
-    deployment.generate(True)
+    ui.info("Populate the Deployment")
+    deployment.generate(document, True)
     deployment.display()
 
-    ui.title("Saving Deployment to JSON file...")
+    ui.info("Saving Deployment to JSON file...")
     deployment.save("test.json")
 
-    ui.title("Loading deployment from JSON file...")
+    ui.info("Loading deployment from JSON file...")
     loaded_deployment = Deployment.load("test.json")
 
     assert deployment.meta_data == loaded_deployment.meta_data
@@ -56,4 +60,5 @@ if __name__ == "__main__":
     
     ui.info("Deleting test.json...")
     os.remove("test.json")
+    deployment.delete()
     ui.info("Done.")

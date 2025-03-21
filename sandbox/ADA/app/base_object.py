@@ -52,10 +52,14 @@ class BaseObject:
         
         return object
     
+    def delete(self):
+        if os.path.exists(self.filename()):
+            os.remove(self.filename())
+    
     def generate(self, document, auto = False):
         type = self.__class__.__name__
         if self.title is None:
-            self.title = f"{self.__class__.__name__} - {document.title}"
+            self.title = f"{type} - {document.title}"
 
         prompt = self.get_prompt(document, auto)
 
@@ -65,7 +69,6 @@ class BaseObject:
             data = self.load_section_data(type)
     
         if data is None or len(data) == 0:
-            ui.info(f"Generating {type} section...")
             messages = []
             messages.append(llm.get_system_message_from_file(f"{self.prompt_folder}/{type}_system_prompt.txt"))
             messages.append({
@@ -88,7 +91,7 @@ class BaseObject:
             self.save_section_data(type, self.content)
         
         if not auto:
-            while (self.user_edits(self.__class__.__name__)):
+            while (self.user_edits(type)):
                 pass
 
         self.content = self.load_section_data(type)
@@ -198,9 +201,9 @@ class BaseObject:
 
     def get_extension(self, type):
         if type == "meta_data":
-            ext = f"_{type}.json"
+            ext = f".json"
         else:
-            ext = f"_{type}.txt"
+            ext = f".md"
         return ext
 
     def __str__(self):

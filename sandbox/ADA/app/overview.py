@@ -33,13 +33,17 @@ class Overview(BaseObject):
 
 if __name__ == "__main__":
     import ui
+    from document import Document
 
     ui.title("Testing Overview class...")
     
     ui.title("Create an empty Overview")
+    document = Document()
+    document.title = "Test Document"
+    
     overview = Overview()
     ui.title("Populate the Overview")
-    overview.generate(True)
+    overview.generate(Document, True)
     overview.display()
 
     ui.title("Saving Overview to JSON file...")
