@@ -1,5 +1,6 @@
 # State Files
-SAVE_FILENAME = "data/save.json"
+SAVE_FILENAME = "data/state.json"
+CANDIDATE_IDEAS_FILE = "data/candidate_ideas.json"
 
 # LLM Prompts
 ROOT_DATA_FOLDER = "data"

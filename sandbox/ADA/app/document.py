@@ -7,14 +7,15 @@ import ui
 from abc import ABC, abstractmethod
 
 class Document:
-    def __init__(self, auto = False, title = None):
+    def __init__(self, auto = False, title = None, description = None):
+        self.auto = auto
         self.title = title
+        self.description = description
         self.meta_data = {}
         self.section_names = ["Overview", "Deployment", "Summary"]
         self.sections = []
 
-        if (title is not None):
-            self.generate(title, auto)
+        self.generate()
 
     def filepath(self, override_name = None):
         if override_name is not None:
@@ -60,8 +61,9 @@ class Document:
 
         return object
     
-    def generate(self, auto = False):
-        self.title = ui.get_user_input("Enter the title of the document:") 
+    def generate(self):
+        if not self.title:
+            self.title = ui.get_user_input("Enter the title of the document:")
 
         for class_name in self.section_names:
             module_name = class_name.lower()
@@ -69,7 +71,7 @@ class Document:
         
             cls = getattr(module, class_name)
             instance = cls()
-            instance.generate(self, auto)
+            instance.generate(self, self.auto)
 
             self.sections.append(instance)
 
@@ -115,7 +117,13 @@ class Document:
             section.display()
 
 if __name__ == "__main__":
-    ui.info("Testing Document class...")
+    ui.info("Testing automatic creation of a Document class...")
+
+    document = Document(True, "Testing with RGs", "Create a resource group.")
+    document.generate()
+    document.display()
+
+    ui.info("Testing manual creation of a Document class...")
 
     document = Document()
     document.generate(False)

@@ -61,10 +61,9 @@ class BaseObject:
         if self.title is None:
             self.title = f"{type} - {document.title}"
 
-        prompt = self.get_prompt(document, auto)
+        prompt = self.get_prompt(document)
 
         data = None
-
         if (self.title is not None):
             data = self.load_section_data(type)
     
@@ -75,7 +74,7 @@ class BaseObject:
                 "role": "user", 
                 "content": f"Generate a {type}. \n{prompt}."
             })
-            response = llm.send_message(messages, False)
+            response = llm.send_message(messages, True)
 
             if isinstance(response, str):
                 data = None
@@ -154,7 +153,7 @@ class BaseObject:
                     "role": "user", 
                     "content": prompt
                 })
-            response = llm.send_message(messages, False)
+            response = llm.send_message(messages, True)
             
             data = ""
             for chunk in response:

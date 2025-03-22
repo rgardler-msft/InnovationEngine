@@ -35,4 +35,4 @@ In this architecture, users will encounter several decision points that can sign
 
 ### Alternatives
 
-A summary of alternative resources that may be employed along with a discussion of why they may be chosen. This section will be introduced with a paragraph explaining that this document focuses on a specific infrastructure type, but that alternatives exist.
+A summary of alternative Microsoft Azure based solutions that may be employed along with a discussion of why they may be chosen. This section will be introduced with a paragraph explaining that this document focuses on a specific infrastructure type, but that alternatives exist.

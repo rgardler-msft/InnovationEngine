@@ -15,7 +15,7 @@ class Overview(BaseObject):
     def __init__(self):
         super().__init__()
 
-    def get_prompt(self, document, auto = False):
+    def get_prompt(self, document):
         """
         Returns the user prompt for the overview of a document.
         """
@@ -23,12 +23,16 @@ class Overview(BaseObject):
         for section in document.sections:
             content += section.content
 
-        if not auto:
-            prompt = ui.get_user_input(f"Describe the desired content of the document titled '{document.title}'.\n")
+        if not document.auto:
+            prompt = ui.get_user_input(f"Provide any guidance you have fot the agent creating your document '{document.title}'.\n")
         else:
-            prompt = "Complete the overview of the document below:"
-
-        prompt += "\n\nCurrent content of the document:\n\n " + content
+            if document.description:
+                prompt = f"Write an overview for a document with the title '{document.title}' and a description of content of '{document.description}'.\n\n"
+            else:
+                prompt = "Write an overview for a document with the title '{document.title}'.\n\n"
+            
+        if content:
+            prompt += "Current content of the document is:\n\n " + content
         return prompt
 
 if __name__ == "__main__":

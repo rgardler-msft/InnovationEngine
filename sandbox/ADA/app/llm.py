@@ -62,11 +62,11 @@ def send_message(messages, is_streaming=True):
     
     try:
         response = client.chat.completions.create(
-                        stream=True,
+                        stream=is_streaming,
                         messages=messages,
                         max_tokens=4096,
-                        temperature=1.0,
-                        top_p=1.0,
+                        temperature=0.5, # 0-1, lower values are more deterministic, higher values more random
+                        top_p=0.5, # 0-1, lower values are more deterministic, higher values more random
                         model=deployment,
                     )
     except Exception as e:
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     })
     
     print ("Sending message...")
-    response = send_message(messages, False)
+    response = send_message(messages, True)
 
     print("Response:")
     if isinstance(response, str):

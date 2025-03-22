@@ -13,7 +13,7 @@ class Summary(BaseObject):
         self.title = "Summary"
         self.content = ""
 
-    def get_prompt(self, document, auto = False):
+    def get_prompt(self, document):
         """
         Returns the user prompt for the summary of a document.
         """
@@ -23,7 +23,7 @@ class Summary(BaseObject):
 
         prompt = "Write a summary section for the document below:\n\n"
 
-        if not auto:
+        if not document.auto:
             prompt += ui.get_user_input(f"Any special instructions for the summary section?")
         
         prompt += "\n\n" + content
