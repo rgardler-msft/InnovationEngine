@@ -40,10 +40,10 @@ if __name__ == "__main__":
     
     ui.info("Create an empty Deployment")
     document = Document()
-    document.title = "Test Document"
+    document.title = "Create a basic Linux VM on Azure"
     
     deployment = Deployment()
-    ui.info("Populate the Deployment")
+    ui.info("Create the Deployment section")
     deployment.generate(document, True)
     deployment.display()
 
@@ -57,8 +57,30 @@ if __name__ == "__main__":
     assert deployment.content == loaded_deployment.content
 
     ui.print_green("Loaded Deployment matches the original.")
-    
     ui.info("Deleting test.json...")
     os.remove("test.json")
+    
+    max_tests = 10
+    passed_tests = False
+    i = 0
+    while i < max_tests and passed_tests == False:
+        i += 1
+        ui.info(f"Testing the generated content in IE (attempt {i} of {max_tests})")
+        filename = deployment.filename()
+        import subprocess
+
+        try:
+            result = subprocess.run(f"ie test '{filename}.md'", shell=True, check=True, capture_output=True, text=True)
+            output = result.stdout
+            print(output)
+            passed_tests = True
+        except subprocess.CalledProcessError as e:
+            # TODO: We need a better output on syserror - see https://github.com/Azure/InnovationEngine/issues/258
+            error_message = e.output
+            ui.error(f"Error executing the document: {error_message}")
+            deployment.user_edits(deployment.__class__.__name__, f"Attempt to fix this error when executing the document.\n\n{error_message}")
+    
+    print()
     deployment.delete()
+    
     ui.info("Done.")

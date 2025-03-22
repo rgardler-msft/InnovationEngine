@@ -57,7 +57,7 @@ def print_suggested_followups(followups):
 def todo(message):
     delete_info_lines()
     
-    print_yellow(f"TODO: {message}")
+    print_cyan(f"TODO: {message}")
     call_stack = traceback.format_stack()
     print_grey(call_stack[-2].splitlines()[0])
     print()
@@ -70,6 +70,22 @@ def info(message, blank_line = True):
     if blank_line:
         print()
         info_line_count += 1
+
+def warning(message):
+    delete_info_lines()
+    
+    print_yellow(f"WARNING: {message}")
+    call_stack = traceback.format_stack()
+    print_grey(call_stack[-2].splitlines()[0])
+    print()
+
+def error(message):
+    delete_info_lines()
+    
+    print_red(f"ERROR: {message}")
+    call_stack = traceback.format_stack()
+    print_grey(call_stack[-2].splitlines()[0])
+    print()
 
 def delete_info_lines():
     global info_line_count
@@ -86,6 +102,9 @@ def character_status(character):
 
 def print_yellow(message):
     print(f"\033[93m{message}\033[0m")
+
+def print_orange(message):
+    print(f"\033[38;5;214m{message}\033[0m")
 
 def print_red(message):
     print(f"\033[91m{message}\033[0m")
@@ -109,22 +128,20 @@ def open_for_editing(filepath):
 if __name__ == "__main__":
     print("Testing UI module...\n\n")
     
-    from character import Character
-    
     title("Test Title 1", 1)
     title("Test Title 2", 2)
     title("Test Title 3", 3)
     title("Test Title 4", 4)
     title("Test Title 5", 5)
     
-    protagonist = Character("Protagonist")
-    character_status(protagonist)
-
     todo("This is a test TODO message")
 
     info("This is an info message, it will be deleted after 2 seconds")
     time.sleep(2)
     delete_info_lines()
+
+    warning("This is a warning message.")
+    error("This is an error message.")
 
     print_suggested_followups(["Followup 1", "Followup 2", "Followup 3"])
     

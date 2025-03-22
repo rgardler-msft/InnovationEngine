@@ -111,31 +111,37 @@ class BaseObject:
         """
         pass
 
-    def user_edits(self, section_name):
+    def  user_edits(self, section_name, prompt = None):
         """
         Enables the editing of a prompt by the user and processes the changes.
         This function allows the user to edit a metadata file or provide a prompt for desired changes.
         It then processes the user's input, updates the metadata, and handles any necessary file operations.
 
         Note that it is possible that the user has edited the save file for this section. This function will not check for that
+        
+        If I prompt is provided then the user will not be asked for input, but rather the prompt will be executed as if the user had typed it. This is useful for agent driven edits.
+        
         Returns:
             bool: True if the metadata was edited either by an LLM prompt or in a way that causes the file to move, False otherwise.
         """
         
         filename = f"{self.filename()}{self.get_extension(section_name)}"
-        ui.open_for_editing(filename)
-        ui.delete_info_lines()
-        prompt = ui.get_user_input(f"{section_name} created and opened in the editor. You can now take one of three actions:\n\t1) Edit the file, save, hit enter here to proceed.\n\t2) Type a prompt for desired changes here and hit enter.\n\t3) Continue without changes (press enter).\n\n")
+        if not prompt:
+            ui.open_for_editing(filename)
+            ui.delete_info_lines()
+            prompt = ui.get_user_input(f"{section_name} created and opened in the editor. You can now take one of three actions:\n\t1) Edit the file, save, hit enter here to proceed.\n\t2) Type a prompt for desired changes here and hit enter.\n\t3) Continue without changes (press enter).\n\n")
 
-        ui.delete_info_lines()
-    
-        original_name = self.title
-        if section_name == "meta_data":
-            content = json.dumps(self.meta_data)
-        else:
-            content = self.load_section_data(section_name)
+            ui.delete_info_lines()
+        
+            original_name = self.title
+        
         is_edited = False
-        if prompt is None or len(prompt) > 0:
+        if prompt:
+            if section_name == "meta_data":
+                content = json.dumps(self.meta_data)
+            else:
+                content = self.load_section_data(section_name)
+
             is_edited = True
             ui.default(prompt)
 
