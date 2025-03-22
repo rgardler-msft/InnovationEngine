@@ -111,6 +111,10 @@ At the end of each step you will expand upon any options the user may want to cu
 
 You will include as many steps as necessary to deploy the entire architecture in an incremental way.
 
+For location you will use WestUS2 unless it is known that the region is not suitable.
+
+When you need to provide a SKU for a resource you will choose one that is suitable for the workload, very common and current on Azure and available in the regiion chosen. 
+
 Each individual step will conform to the following markdown format. The content within this example should not be used:
 
 ## Descriptive Step Title 
