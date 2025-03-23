@@ -56,7 +56,7 @@ class BaseObject:
         if os.path.exists(self.filename()):
             os.remove(self.filename())
     
-    def generate(self, document, auto = False):
+    def generate(self, document):
         type = self.__class__.__name__
         if self.title is None:
             self.title = f"{type} - {document.title}"
@@ -89,7 +89,7 @@ class BaseObject:
             self.content = data
             self.save_section_data(type, self.content)
         
-        if not auto:
+        if not document.auto:
             while (self.user_edits(type)):
                 pass
 
