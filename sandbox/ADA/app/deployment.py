@@ -17,16 +17,15 @@ class Deployment(BaseObject):
     def __init__(self):
         super().__init__()
 
-    def generate(self, document, auto = False):
+    def generate(self, document):
         """
         Generates the deployment section of the document.
         
         Args:
             document (Document): The document to which this deployment section belongs.
-            auto (bool): If True, the prompt is generated automatically without user input. Note that some sections always automatically generate a prompt.
         """
-        super().generate(document, auto)
-        self.auto_fix_errors()
+        super().generate(document)
+        self.test_and_fix_errors()
 
     def get_prompt(self, document):
         """
@@ -34,7 +33,8 @@ class Deployment(BaseObject):
         """
         content = ""
         for section in document.sections:
-            content += section.content
+            if section.instance and section.instance.content:
+                content += section.instance.content
 
         if not document.auto:
             prompt = ui.get_user_input(f"Provide any special instructions for the deployment section of the document titled {document.title}.\n")
@@ -45,7 +45,7 @@ class Deployment(BaseObject):
         prompt += content
         return prompt
     
-    def auto_fix_errors(self, max_tests=10):
+    def test_and_fix_errors(self, max_tests=10):
         """
         Test the Document in the Innovation Engine.
         If the test fails then another call to the LLM is made to try to fix the error.
@@ -65,17 +65,19 @@ class Deployment(BaseObject):
 
             try:
                 process = subprocess.Popen(f"ie test '{filename}.md'", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                for line in iter(process.stdout.readline, ''):
-                    print(line, end='')  # Stream to stdout
-                process.stdout.close()
-                process.wait()
+                stdout, stderr = process.communicate()
+                ui.info(stdout)
+                if stderr:
+                    ui.error(stderr)
+                
                 if process.returncode != 0:
-                    raise subprocess.CalledProcessError(process.returncode, process.args, output=process.stderr.read())
+                    # TODO: We need a better output on syserror - see https://github.com/Azure/InnovationEngine/issues/258
+                    raise subprocess.CalledProcessError(process.returncode, process.args, output=stdout)
+                
                 self.passed_tests = True
             except subprocess.CalledProcessError as e:
-                # TODO: We need a better output on syserror - see https://github.com/Azure/InnovationEngine/issues/258
                 error_message = e.output
-                ui.error(f"Error executing the document: {error_message}")
+                ui.error(f"\nError executing the document: {error_message}")
                 self.user_edits(self.__class__.__name__, f"Fix this error, thrown when executing the document.\n\n{error_message}")
         
         return self.passed_tests
@@ -86,13 +88,27 @@ if __name__ == "__main__":
 
     ui.title("Testing Deployment class...")
     
-    ui.info("Create an empty Deployment")
+    ui.info("Testing automated creation of a deployment section of a document")
+    document = Document(False, "Create a Resource Group", "Create a resource group in the UK South region")
+    deployment = Deployment()
+    document.auto = True # switch to auto so that the deployment will be created automatically
+    ui.info("Create the Deployment section")
+    deployment.generate(document)
+    deployment.display()
+
+    if deployment.passed_tests:
+        ui.print_green("Successfully created unattended (automated) document.")
+    else:
+        ui.print_red("Failed to create unattended (automated) document.")
+        exit(1)
+        
+    ui.info("Testing manual creation of a deployment section of a document")
     document = Document()
     document.title = "Create a basic Linux VM on Azure"
     
     deployment = Deployment()
     ui.info("Create the Deployment section")
-    deployment.generate(document, True)
+    deployment.generate(document)
     deployment.display()
 
     ui.info("Saving Deployment to JSON file...")
@@ -108,7 +124,7 @@ if __name__ == "__main__":
     ui.info("Deleting test.json...")
     os.remove("test.json")
     
-    deployment.auto_fix_errors()
+    deployment.test_and_fix_errors()
 
     print()
     deployment.delete()

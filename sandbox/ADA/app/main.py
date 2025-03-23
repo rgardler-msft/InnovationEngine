@@ -12,7 +12,9 @@ class DocumentIdeaManager:
                 json.dump([], file)
 
     def add_entry(self, title, description):
-        entry = {"title": title, "description": description}
+        entry = {"title": title, 
+                 "description": description
+                }
         data = self._read_file()
         data.append(entry)
         self._write_file(data)
@@ -59,6 +61,10 @@ def main():
                 selected_entry = entries[choice - 1]
                 ui.info(f"Generating document for: {selected_entry['title']}")
                 document = Document(True, selected_entry['title'], selected_entry['description'])
+                if document.all_tests_passed():
+                    ui.print_green("Document generated and tested successfully.")
+                else:
+                    ui.warning("Document generated, but tests failed.")
             else:
                 ui.warning("Invalid document number.")
         else:

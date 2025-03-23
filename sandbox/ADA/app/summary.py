@@ -19,7 +19,8 @@ class Summary(BaseObject):
         """
         content = ""
         for section in document.sections:
-            content += section.content
+            if section.instance and section.instance.content:
+                content += section.instance.content
 
         prompt = "Write a summary section for the document below:\n\n"
 

@@ -21,15 +21,16 @@ class Overview(BaseObject):
         """
         content = f"# {document.title}\n\n"
         for section in document.sections:
-            content += section.content
+                if section.instance and section.instance.content:
+                    content += section.instance.content
 
-        if not document.auto:
-            prompt = ui.get_user_input(f"Provide any guidance you have fot the agent creating your document '{document.title}'.\n")
+        if not document.auto and not document.description:
+            prompt = ui.get_user_input(f"Provide any guidance you have for the agent creating your document '{document.title}'.\n")
         else:
             if document.description:
                 prompt = f"Write an overview for a document with the title '{document.title}' and a description of content of '{document.description}'.\n\n"
             else:
-                prompt = "Write an overview for a document with the title '{document.title}'.\n\n"
+                prompt = f"Write an overview for a document with the title '{document.title}'.\n\n"
             
         if content:
             prompt += "Current content of the document is:\n\n " + content

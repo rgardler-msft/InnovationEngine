@@ -6,17 +6,33 @@ import ui
 
 from abc import ABC, abstractmethod
 
+class Section:
+    def __init__(self, name, requires_test = False):
+        self.name = name
+        self.requires_test = requires_test
+        self.instance = None
+
 class Document:
     def __init__(self, auto = False, title = None, description = None):
         self.auto = auto
         self.title = title
         self.description = description
         self.meta_data = {}
-        self.section_names = ["Overview", "Deployment", "Summary"]
-        self.sections = []
+        self.sections = [Section("Overview"), 
+                                  Section("Deployment", True),
+                                  Section("Summary")]
 
         self.generate()
 
+    def all_tests_passed(self):
+        """
+        Check if all tests have passed.
+        """
+        for section in self.sections:
+            if section.requires_test and not section.instance.passed_tests:
+                return False
+        return True
+    
     def filepath(self, override_name = None):
         if override_name is not None:
             name = override_name
@@ -47,7 +63,8 @@ class Document:
 
         content = f"# {self.title}\n\n"
         for section in self.sections:
-            content += section.content + "\n\n"
+            if section.instance and section.instance.content:
+                content += section.instance.content + "\n\n"
 
         with open(filename, 'w') as f:
             f.write(content)
@@ -65,15 +82,15 @@ class Document:
         if not self.title:
             self.title = ui.get_user_input("Enter the title of the document:")
 
-        for class_name in self.section_names:
-            module_name = class_name.lower()
+        for section in self.sections:
+            module_name = section.name.lower()
             module = importlib.import_module(module_name)
         
-            cls = getattr(module, class_name)
+            cls = getattr(module, section.name)
             instance = cls()
-            instance.generate(self, self.auto)
+            instance.generate(self)
 
-            self.sections.append(instance)
+            section.instance = instance
 
         self.save(self.filename())
         ui.open_for_editing(f"{self.filename()}.md")
@@ -114,7 +131,7 @@ class Document:
         """
         ui.title(self.title, 1)
         for section in self.sections:
-            section.display()
+            section.instance.display()
 
 if __name__ == "__main__":
     ui.info("Testing automatic creation of a Document class...")
@@ -126,5 +143,5 @@ if __name__ == "__main__":
     ui.info("Testing manual creation of a Document class...")
 
     document = Document()
-    document.generate(False)
+    document.generate()
     document.display()
