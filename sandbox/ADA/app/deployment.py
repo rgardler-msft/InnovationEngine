@@ -1,4 +1,5 @@
 import os
+import settings
 import subprocess
 import ui
 
@@ -45,7 +46,7 @@ class Deployment(BaseObject):
         prompt += content
         return prompt
     
-    def test_and_fix_errors(self, max_tests=10):
+    def test_and_fix_errors(self):
         """
         Test the Document in the Innovation Engine.
         If the test fails then another call to the LLM is made to try to fix the error.
@@ -58,9 +59,9 @@ class Deployment(BaseObject):
             bool: True if the test passed, False otherwise. Note this can also be retrieved from `Deployment.passed_tests`.
         """
         i = 0
-        while i < max_tests and self.passed_tests == False:
+        while i < settings.MAX_TEST_RUNS and self.passed_tests == False:
             i += 1
-            ui.info(f"Testing the generated content in IE (attempt {i} of {max_tests})")
+            ui.info(f"Testing the generated content in IE (attempt {i} of {settings.MAX_TEST_RUNS})")
             filename = self.filename()
 
             try:
