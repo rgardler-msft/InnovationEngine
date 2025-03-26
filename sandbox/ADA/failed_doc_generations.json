@@ -1,0 +1,8 @@
+[
+    {
+        "title": "Simple Flask (Python) Application on Azure",
+        "description": "a simple Python Flask website, made for demonstration purposes only. The project can be developed locally with Flask and can be deployed to Azure App Service using the infrastructure files in infra. ",
+        "filename": "data/Document/Simple Flask (Python) Application on Azure/Simple Flask (Python) Application on Azure.md",
+        "tests_passed": false
+    }
+]

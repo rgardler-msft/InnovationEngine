@@ -156,10 +156,14 @@ class BaseObject:
             response = llm.send_message(messages, True)
             
             data = ""
-            for chunk in response:
-                if chunk.choices:
-                    if chunk.choices[0].delta.content:
-                        data += chunk.choices[0].delta.content
+            try:
+                for chunk in response:
+                    if chunk.choices:
+                        if chunk.choices[0].delta.content:
+                            data += chunk.choices[0].delta.content
+            except llm.ReadTimeoutError:
+                ui.error("Read timeout occurred while processing the response.")
+                data = None
             
             if (section_name == "meta_data"):
                 self.meta_data = json.loads(data)

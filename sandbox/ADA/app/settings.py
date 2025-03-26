@@ -1,6 +1,8 @@
 # State Files
 SAVE_FILENAME = "data/state.json"
-CANDIDATE_IDEAS_FILE = "Docs_status.json"
+DOCUMENT_CANDIDATES_FILEPATH = "doc_candidates.json"
+FAILED_DOCUMENT_GENERATIONS_FILEPATH = "failed_doc_generations.json"
+PASSED_DOCUMENT_GENERATIONS_FILEPATH = "passed_doc_generations.json"
 
 # LLM Prompts
 ROOT_DATA_FOLDER = "data"
