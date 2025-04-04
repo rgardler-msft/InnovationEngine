@@ -2,6 +2,7 @@ import os
 import settings
 import subprocess
 import ui
+import datetime
 
 from base_object import BaseObject
 
@@ -58,10 +59,11 @@ class Deployment(BaseObject):
         returns:
             bool: True if the test passed, False otherwise. Note this can also be retrieved from `Deployment.passed_tests`.
         """
+        self.error_log = []  # Initialize an error log to store error messages and timestamps
         i = 0
         while i < settings.MAX_TEST_RUNS and self.passed_tests == False:
             i += 1
-            ui.info(f"Testing the generated content in IE (attempt {i} of {settings.MAX_TEST_RUNS})")
+            ui.info(f"Testing the generated deployment content in IE (attempt {i} of {settings.MAX_TEST_RUNS})")
             filename = self.filename()
 
             try:
@@ -78,14 +80,23 @@ class Deployment(BaseObject):
                 self.passed_tests = True
             except subprocess.CalledProcessError as e:
                 error_message = e.output
+                timestamp = datetime.datetime.now().isoformat()
+                self.error_log.append({"timestamp": timestamp, "error_message": error_message})  # Store error and timestamp
+                
+                if "ERROR: AADSTS70043: The refresh token has expired" in error_message:
+                    ui.error("The refresh token has expired. Please re-authenticate with the command `az login --use-device-code`.")
+                    break
+
+                # TODO: Can we do better than this? Perhaps having a Copilot explain what the error means? Will that improve success rated? It will, at least, allow us to provide special instructions for common errors.
                 ui.error(f"\nError executing the document: {error_message}")
                 self.user_edits(self.__class__.__name__, f"Fix this error, thrown when executing the document.\n\n{error_message}")
-        
+
         return self.passed_tests
 
 if __name__ == "__main__":
     import ui
     from document import Document
+    import datetime
 
     ui.title("Testing Deployment class...")
     

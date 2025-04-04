@@ -1,8 +1,9 @@
 [
     {
-        "title": "Simple Flask (Python) Application on Azure",
-        "description": "a simple Python Flask website, made for demonstration purposes only. The project can be developed locally with Flask and can be deployed to Azure App Service using the infrastructure files in infra. ",
-        "filename": "data/Document/Simple Flask (Python) Application on Azure/Simple Flask (Python) Application on Azure.md",
+        "title": "Manage Azure resource groups by using Azure CLI",
+        "description": null,
+        "filename": "data/Document/Manage Azure resource groups by using Azure CLI/Manage Azure resource groups by using Azure CLI.md",
+        "published_source": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/manage-resource-groups-cli",
         "tests_passed": false
     }
 ]

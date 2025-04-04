@@ -5,6 +5,7 @@ import os
 import ui
 
 from abc import ABC, abstractmethod
+import requests
 
 class Section:
     def __init__(self, name, requires_test = False):
@@ -13,14 +14,17 @@ class Section:
         self.instance = None
 
 class Document:
-    def __init__(self, auto = False, title = None, description = None):
+    def __init__(self, auto = False, title = None, description = None, published_source = None):
         self.auto = auto
         self.title = title
         self.description = description
+        self.published_source = published_source
         self.meta_data = {}
-        self.sections = [Section("Overview"), 
-                                  Section("Deployment", True),
-                                  Section("Summary")]
+        self.sections = [
+            Section("Overview"), 
+            Section("Deployment", True),
+            Section("Summary")
+        ]
 
         self.generate()
 
@@ -33,23 +37,40 @@ class Document:
                 return False
         return True
     
+    def get_errors(self):
+        """
+        Get the errors discovered in testing all sections. If no errors are found then an empty list is returned.
+        If there all_tests_passed() is true then the last error (if any) in this list will have been resolved during generation.
+        If all_tests_passed() is false then the last error in this list will be the most recent at which the generation was aborted.
+        """
+        errors = []
+        for section in self.sections:
+            if section.requires_test and section.instance.error_log:
+                errors.extend(section.instance.error_log)
+        return errors
+
     def filepath(self, override_name = None):
         if override_name is not None:
             name = override_name
         else:
             name = self.title
-        return f"data/{self.__class__.__name__}/{name}"
+        encoded_name = "".join(c if c.isalnum() or c in (' ', '.', '_') else '_' for c in name).strip()
+        return f"data/{self.__class__.__name__}/{encoded_name}"
     
     def filename(self, override_name = None):
         if override_name is not None:
             name = override_name
         else:
             name = self.title
-        return f"{self.filepath(name)}/{name}"
+        encoded_name = "".join(c if c.isalnum() or c in (' ', '.', '_') else '_' for c in name).strip()
+        return f"{self.filepath(encoded_name)}/{encoded_name}"
 
     def save(self, filename = None):
         if filename is None:
             filename = self.filename()
+
+        if not filename.endswith(".json"):
+            filename = os.path.splitext(filename)[0] + ".json"
         
         os.makedirs(os.path.dirname(filename), exist_ok=True)
 
@@ -71,6 +92,9 @@ class Document:
 
     @classmethod
     def load(cls, filename):
+        if not filename.endswith(".json"):
+            filename = os.path.splitext(filename)[0] + ".json"
+
         with open(filename, 'r') as f:
             state = json.load(f)
 
@@ -81,6 +105,18 @@ class Document:
     def generate(self):
         if not self.title:
             self.title = ui.get_user_input("Enter the title of the document:")
+
+        if self.published_source:
+            response = requests.get(self.published_source)
+            if response.status_code == 200:
+                published_content = response.text
+                if (self.description):
+                    self.description += "\n\nCurrent content for this file is copied below. You should use this as a guide for the content you create, but should ensure that it is a valid executable doc and improve on readability wherever possible:\n\n" + published_content
+                else:
+                    self.description = "\n\nCurrent content for this file is copied below. You should use this as a guide for the content you create, but should ensure that it is a valid executable doc and improve on readability wherever possible:\n\n" + published_content
+            else:
+                raise Exception(f"Failed to retrieve content from {self.published_source}. Status code: {response.status_code}")
+                return
 
         for section in self.sections:
             module_name = section.name.lower()
@@ -134,7 +170,13 @@ class Document:
             section.instance.display()
 
 if __name__ == "__main__":
-    ui.info("Testing automatic creation of a Document class...")
+    ui.info("Testing rewrite of existing content...")
+
+    document = Document(True, "Create the infrastructure for deploying Apache Airflow on Azure Kubernetes Service (AKS)", None, "https://raw.githubusercontent.com/MicrosoftDocs/azure-aks-docs/refs/heads/main/articles/aks/airflow-create-infrastructure.md")
+    document.generate()
+    document.display()
+
+    ui.info("Testing automatic creation of a document from a title and brief description...")
 
     document = Document(True, "Testing with RGs", "Create a resource group.")
     document.generate()

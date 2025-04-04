@@ -13,7 +13,7 @@ pip install --upgrade pip setuptools
 pip install .
 ```
 
-Setup your environment, it's easiest to add this to a `.env` file in your workspace route.
+Setup your environment, it's easiest to add this to a `.env` file in your workspace.
 
 ```bash
 AZURE_OPENAI_API_KEY="<your key>"
@@ -26,7 +26,7 @@ AZURE_OPENAI_API_VERSION="2024-12-01-preview"
 ## Running
 
 ```bash
-python app/Document.py
+python app/main.py
 ```
 
 `Document` is the top level object and represents the docuent you are authoring. It consists of three sections `Overview`, `Deployment` and `Summary`. By running the above command you are telling the system you want to create a `Document`. Each section is created in the same way and the user is given the opportunity to edit, or have the LLM edit, the generated section before moving on to the next. Each section becomes input to the generation of the next section.
@@ -67,6 +67,10 @@ Application code is in the `app` folder
 `BaseObject` is the parent class for each of `Outline`, `Deployment`, `Summary` sections
 `llm` is the interface to the LLM. To change the LLM provider change this implementation
 `ui` is the UI interface. To provide a different UX create an alternative implementation
+
+### Confgiuring VS Code
+
+Assuming you have added the environment variables above into a `.env` file in the `ADA` root directory.
 
 ### Testing
 

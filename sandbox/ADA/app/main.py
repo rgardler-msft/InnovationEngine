@@ -114,24 +114,33 @@ def main():
             idx = 0
             candidate_entries = manager.get_candidate_entries()
             if len(candidate_entries) > 0:
-                ui.info("Generate a document from the ideas list:")
+                ui.info("") # Blank Line
+                ui.info("Generate a document from the ideas list:", False)
                 for idx, entry in enumerate(candidate_entries, start=1):
-                    ui.info(f"{idx} {entry['title']}\n\t{entry['description']}")
+                    ui.info(f"{idx} {entry['title']}", False)
+                    if entry['description'] not in (None, ""):
+                        ui.info(f"\n\t{entry['description']}", False)
+                    if 'published_source' in entry and entry['published_source'] not in (None, ""):
+                        ui.info(f"\n\tConvert: {entry['published_source']}", False)
+                    ui.info("") # Blank Line
 
+            ui.info("--------------------------------------")
             failed_entries = manager.get_generated_but_failed_entries()
             if len(failed_entries) > 0:
                 ui.info("Edit a document that failed tests:")
                 for idx, entry in enumerate(failed_entries, start=idx + 1):
                     ui.info(f"{idx} {entry['title']}\n\t{entry['description']}")
 
+            ui.info("--------------------------------------")
             passed_entries = manager.get_generated_and_passed_entries()
             listGeneratedIdx = idx + 1
             ui.info(f"{listGeneratedIdx}. List {len(passed_entries)} generated documents")
 
+            ui.info("--------------------------------------")
             addItemIdx = listGeneratedIdx + 1
             ui.info(f"{addItemIdx}. Add a candidate document.")
             
-            exitIdx = listGeneratedIdx + 1
+            exitIdx = addItemIdx + 1
             ui.info(f"{exitIdx}. Exit")
 
             try:
@@ -140,12 +149,14 @@ def main():
                 choice = None
                 ui.warning("Invalid input. Please enter a number.")
 
-        if choice == addItemIdx:
+        if choice == addItemIdx: # Add Item
+            ui.delete_info_lines()
             title = ui.get_user_input("Enter title: ")
             description = ui.get_user_input("Enter description: ")
             manager.add_entry(title, description)
             ui.info("Entry added successfully.")
-        elif choice == listGeneratedIdx:
+        elif choice == listGeneratedIdx: # List generated documents
+            ui.delete_info_lines()
             ui.info("Generated documents:")
             candidate_entries = manager.get_generated_and_passed_entries()
             if len(candidate_entries) == 0:
@@ -154,13 +165,18 @@ def main():
                 for idx, entry in enumerate(candidate_entries, start=1):
                     ui.info(f"{idx} {entry['title']}\n\t{entry['description']}")
             ui.get_user_input("Press Enter to continue...")
-        elif choice == exitIdx:
+        elif choice == exitIdx: # Exit
+            ui.delete_info_lines()
             ui.info("Exiting...")
             break
-        elif 1 <= choice <= len(candidate_entries):
+        elif 1 <= choice <= len(candidate_entries): # Generate document
+            ui.delete_info_lines()
             selected_entry = candidate_entries[choice - 1]
             ui.info(f"Generating document for: {selected_entry['title']}")
-            document = Document(True, selected_entry['title'], selected_entry['description'])
+            if selected_entry['published_source'] not in (None, ""): # convert a published doc
+                document = Document(True, selected_entry['title'], selected_entry['description'], selected_entry['published_source'])
+            else:
+                document = Document(False, selected_entry['title'], selected_entry['description'])
 
             ui.info(f"Document saved as: {selected_entry['filename']}.md/.json")
             selected_entry['filename'] = document.filename() + ".md"
@@ -180,12 +196,44 @@ def main():
                 
                 failed_entries = manager.get_generated_but_failed_entries()
                 failed_entries.append(selected_entry)
-                manager._write_file(candidate_entries, settings.DOCUMENT_CANDIDATES_FILEPATH)
+                manager._write_file(failed_entries, settings.FAILED_DOCUMENT_GENERATIONS_FILEPATH)
                 candidate_entries.pop(choice - 1)
-                manager._write_file(failed_entries, settings.FAILED_DOCUMENT_GENERATIONS_FILEPATH)        
+                manager._write_file(candidate_entries, settings.DOCUMENT_CANDIDATES_FILEPATH)        
 
+                errors = document.get_errors()
+                if errors:
+                    ui.error(errors[-1]['error_message'])
                 ui.info("Opening document for editing...")
                 ui.open_for_editing(selected_entry['filename'])
+        elif len(candidate_entries) <= choice < len(candidate_entries) + len(failed_entries): # Edit failed document
+                ui.delete_info_lines()
+                ui.info("Opening deployment section of the document for editing...")
+                selected_entry = failed_entries[choice - 1]
+                document = Document.load(selected_entry["filename"])
+                for section in document.sections:
+                    if section.requires_test:
+                        ui.info(f"Editing {section.name} section...")
+                        while section.instance.passed_tests == False:
+                            section.instance.user_edits(section.instance.__class__.__name__)
+                            action = ui.get_user_input("Enter 'test' to run tests or 'stop' to stop editing: ").strip().lower()
+                            if action == 'test':
+                                section.instance.test_and_fix_errors()
+                                if document.all_tests_passed():
+                                    ui.print_green("Document passed all tests.")
+                                    selected_entry['tests_passed'] = True
+                                    failed_entries.remove(selected_entry)
+                                    manager._write_file(failed_entries, settings.FAILED_DOCUMENT_GENERATIONS_FILEPATH)
+                                    passed_entries = manager.get_generated_and_passed_entries()
+                                    passed_entries.append(selected_entry)
+                                    manager._write_file(passed_entries, settings.PASSED_DOCUMENT_GENERATIONS_FILEPATH)
+                                    break
+                                else:
+                                    ui.warning("Document failed tests, see console output. Please continue editing.")
+                            elif action == 'stop':
+                                ui.info("Stopped editing.")
+                                break
+                            else:
+                                ui.warning("Invalid input. Please enter 'test' or 'stop'.")
         else:
             ui.warning("Invalid choice. Please try again.")
 
