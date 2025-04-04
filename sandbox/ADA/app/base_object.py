@@ -22,7 +22,8 @@ class BaseObject:
             name = override_name
         else:
             name = self.title
-        return f"data/{self.__class__.__name__}/{name}"
+        encoded_name = "".join(c if c.isalnum() or c in (' ', '.', '_') else '_' for c in name).strip()
+        return f"data/{self.__class__.__name__}/{encoded_name}"
     
     def filename(self, override_name = None):
         if override_name is not None:
@@ -60,6 +61,8 @@ class BaseObject:
         type = self.__class__.__name__
         if self.title is None:
             self.title = f"{type} - {document.title}"
+
+        ui.info(f"Generating {type} for {document.title}...")
 
         prompt = self.get_prompt(document)
 
@@ -118,7 +121,7 @@ class BaseObject:
 
         Note that it is possible that the user has edited the save file for this section. This function will not check for that
         
-        If I prompt is provided then the user will not be asked for input, but rather the prompt will be executed as if the user had typed it. This is useful for agent driven edits.
+        If a prompt is provided then the user will not be asked for input, but rather the prompt will be executed as if the user had typed it. This is useful for agent driven edits.
         
         Returns:
             bool: True if the metadata was edited either by an LLM prompt or in a way that causes the file to move, False otherwise.
