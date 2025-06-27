@@ -1,0 +1,34 @@
+{
+  "name": "ie-copilot-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for executing Innovation Engine commands via GitHub Copilot",
+  "type": "module",
+  "main": "build/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/server.js",
+    "start:http": "node build/server.js --http",
+    "dev": "tsc --watch",
+    "test": "node build/server.js --test"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "innovation-engine",
+    "copilot",
+    "executable-documentation"
+  ],
+  "author": "Innovation Engine Team",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.1",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.33",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
