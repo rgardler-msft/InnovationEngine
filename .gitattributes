@@ -1,2 +1,10 @@
+* text=auto
 *.md text eol=lf 
 *.sh text eol=lf
+*.go text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.ini text eol=lf
+Makefile text eol=lf
+Dockerfile text eol=lf
