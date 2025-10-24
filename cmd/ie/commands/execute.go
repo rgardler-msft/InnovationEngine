@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Azure/InnovationEngine/internal/lib"
+
 	"github.com/Azure/InnovationEngine/internal/engine"
 	"github.com/Azure/InnovationEngine/internal/engine/common"
 	"github.com/Azure/InnovationEngine/internal/logging"
@@ -44,6 +46,23 @@ var executeCommand = &cobra.Command{
 			logging.GlobalLogger.Errorf("Error: No markdown file specified.")
 			cmd.Help()
 			os.Exit(1)
+		}
+
+		// Ensure we are in the original invocation directory before parsing
+		// the first document regardless of any working directory flags that
+		// will be applied later during execution.
+		if OriginalInvocationDirectory != "" {
+			if err := os.Chdir(OriginalInvocationDirectory); err != nil {
+				logging.GlobalLogger.Warnf("Failed to change to invocation directory '%s': %s", OriginalInvocationDirectory, err)
+			} else {
+				logging.GlobalLogger.Debugf("Changed to original invocation directory: %s", OriginalInvocationDirectory)
+				// Overwrite any stale working directory state so the first
+				// command executes relative to the invocation directory, not
+				// a previous run.
+				if err := lib.SaveWorkingDirectoryStateFile(lib.DefaultWorkingDirectoryStateFile, OriginalInvocationDirectory); err != nil {
+					logging.GlobalLogger.Warnf("Failed to persist invocation working directory: %s", err)
+				}
+			}
 		}
 
 		verbose, _ := cmd.Flags().GetBool("verbose")

@@ -118,3 +118,19 @@ func LoadWorkingDirectoryStateFile(path string) (string, error) {
 func DeleteWorkingDirectoryStateFile(path string) error {
 	return os.Remove(path)
 }
+
+// SaveWorkingDirectoryStateFile writes the provided working directory path to
+// the state file, creating or truncating it as needed. This allows callers to
+// explicitly override any previously persisted working directory before the
+// first command executes.
+func SaveWorkingDirectoryStateFile(path string, workingDir string) error {
+	if workingDir == "" {
+		return fmt.Errorf("working directory is empty")
+	}
+	// Ensure trailing newline for consistency with pwd > file behavior.
+	content := workingDir
+	if !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+	return os.WriteFile(path, []byte(content), 0644)
+}
