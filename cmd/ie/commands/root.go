@@ -44,7 +44,7 @@ func ExecuteCLI() {
 		String(
 			"log-level",
 			string(logging.Debug),
-			"Configure the log level for statements written to ie.log. Valid options are 'trace', 'debug', 'info', 'warn', 'error', 'fatal'",
+			"Set file logging level (trace|debug|info|warn|error|fatal). Controls entries written to ie.log; --verbose enriches interactive console separately",
 		)
 	rootCommand.PersistentFlags().
 		String(

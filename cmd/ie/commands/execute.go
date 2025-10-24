@@ -19,7 +19,7 @@ func init() {
 
 	// Bool flags
 	executeCommand.PersistentFlags().
-		Bool("verbose", false, "Enable verbose logging & standard output.")
+		Bool("verbose", false, "Show extra console context (working dirs, full command output). For deeper persisted diagnostics use --log-level")
 	executeCommand.PersistentFlags().
 		Bool("do-not-delete", false, "Do not delete the Azure resources created by the Azure CLI commands executed.")
 

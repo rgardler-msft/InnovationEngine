@@ -1,8 +1,9 @@
 package commands
 
 import (
-    "os"
-    "github.com/Azure/InnovationEngine/internal/logging"
+	"os"
+
+	"github.com/Azure/InnovationEngine/internal/logging"
 )
 
 // OriginalInvocationDirectory captures the directory from which the IE command
@@ -11,10 +12,10 @@ import (
 var OriginalInvocationDirectory string
 
 func init() {
-    cwd, err := os.Getwd()
-    if err != nil {
-        logging.GlobalLogger.Warnf("Failed to capture invocation directory: %s", err)
-        return
-    }
-    OriginalInvocationDirectory = cwd
+	cwd, err := os.Getwd()
+	if err != nil {
+		logging.GlobalLogger.Warnf("Failed to capture invocation directory: %s", err)
+		return
+	}
+	OriginalInvocationDirectory = cwd
 }

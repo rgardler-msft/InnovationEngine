@@ -17,6 +17,12 @@ import (
 func init() {
 	rootCommand.AddCommand(interactiveCommand)
 
+	// Bool flags
+	interactiveCommand.PersistentFlags().
+		Bool("verbose", false, "Show extra console context (working dirs, full command output). For deeper persisted diagnostics use --log-level")
+	interactiveCommand.PersistentFlags().
+		Bool("do-not-delete", false, "Do not delete the Azure resources created by the Azure CLI commands executed.")
+
 	// String flags
 	interactiveCommand.PersistentFlags().
 		String("correlation-id", "", "Adds a correlation ID to the user agent used by a scenarios azure-cli commands.")

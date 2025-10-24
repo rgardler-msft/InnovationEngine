@@ -164,6 +164,35 @@ Local variables declared within the markdown document will override CLI argument
 Local variables (ex: `REGION=eastus`) will not persist across code blocks. It is recommended
 to instead use environment variables (ex: `export REGION=eastus`).
 
+### Logging and Verbose Output
+
+Innovation Engine provides two related but distinct controls over runtime insight:
+
+* `--log-level` controls what severities are written by the structured logger to the persistent log file `ie.log` (falling back to stdout if file creation fails). Accepted values: `trace`, `debug`, `info`, `warn`, `error`, `fatal`.
+* `--verbose` is a convenience flag for richer, human‑facing console output during execution (e.g. working directory context and full command stdout blocks rendered inline).
+
+Why both? They serve different audiences:
+
+* Use `--log-level` when you need deeper diagnostics for post‑run analysis or CI logs without cluttering interactive output for end users.
+* Use `--verbose` when you want more immediate context while stepping through a scenario but don’t need low‑level trace events persisted.
+
+Overlap: Running with `--log-level=debug` (or `trace`) implicitly emits some verbose contextual lines even if `--verbose` is not set. This is intentional for developer diagnostics. If you want concise console output but detailed logs, choose `--log-level=info` (or higher) without `--verbose`.
+
+Quick examples:
+
+```bash
+# Minimal console, detailed file logging
+ie execute tutorial.md --log-level=debug
+
+# Rich interactive console context, default debug logging
+ie interactive tutorial.md --verbose
+
+# Max diagnostics (console + file)
+ie execute tutorial.md --verbose --log-level=trace
+```
+
+Tip: Keep routine automation at `--log-level=info` without `--verbose` to reduce noise; escalate only when investigating issues.
+
 ### Setting Up GitHub Actions to use Innovation Engine
 
 After documentation is set up to take advantage of automated testing a github 
