@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/Azure/InnovationEngine/internal/shells"
 	"github.com/Azure/InnovationEngine/internal/terminal"
 	"github.com/Azure/InnovationEngine/internal/ui"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -117,6 +119,21 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 				finalCommandOutput = ui.IndentMultiLineCommand(renderedCommand.StdOut, 4)
 			} else {
 				finalCommandOutput = ui.IndentMultiLineCommand(block.Content, 4)
+			}
+
+			// Debug/verbose working directory output before each command block.
+			if e.Configuration.Verbose || logging.GlobalLogger.GetLevel() <= logrus.DebugLevel {
+				// Attempt to read persisted working directory state first; fall back to current process working directory.
+				workingDir, err := lib.LoadWorkingDirectoryStateFile(lib.DefaultWorkingDirectoryStateFile)
+				if err != nil || workingDir == "" {
+					cwd, cwdErr := os.Getwd()
+					if cwdErr == nil {
+						workingDir = cwd
+					}
+				}
+				// Print to console (indented to align with command blocks) and log for deeper tracing.
+				fmt.Printf("    %s\n", ui.VerboseStyle.Render("Working directory: "+workingDir))
+				logging.GlobalLogger.Debugf("Working directory before command: %s", workingDir)
 			}
 
 			fmt.Print("    " + finalCommandOutput)
