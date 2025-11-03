@@ -136,10 +136,7 @@ Result blocks are distinguished in Executable documentation by a custom
 expected_similarity comment tag followed by a code block. For example
 
 \<!--expected_similarity=0.8-->
-<!--expected_similarity=0.8-->
-```text
-Hello world
-```
+
 In the above example we have escaped the comment syntax so that it shows up in 
 markdown. Otherwise, the tag of expected_similarity is completely invisible.
 
@@ -148,6 +145,10 @@ specifies how closely the output needs to match the results block. 0 being no
 similarity, 1 being an exact match.
 
 >**Note** It may take a little bit of trial and error to find the exact value for expected_similarity.
+
+The numerical similarity value is quick and easy to use, but it can be inaccurate. An alternative approach, which is more reliable, is to use regular expressions, for example, the following will match both hello and goodbye messages:
+
+\<!-- expected_similarity="^(Hello|Goodbye) World$" -->
 
 ### Environment Variables
 
