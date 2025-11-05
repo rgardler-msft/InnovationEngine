@@ -143,9 +143,16 @@ func CreateScenarioFromMarkdown(
 			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 				url = filepath.Join(filepath.Dir(path), url)
 			}
+			// Explicit pre-check for local file existence to avoid bubbling up an error.
+			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") && !fs.FileExists(url) {
+				logging.GlobalLogger.Warnf("Prerequisite '%s' not found (continuing without it)", url)
+				continue
+			}
 			prerequisiteSource, err := resolveMarkdownSource(url)
 			if err != nil {
-				return nil, err
+				// Requirement: When a prerequisite document is not found output a warning and continue.
+				logging.GlobalLogger.Warnf("Prerequisite '%s' could not be loaded: %v (continuing without it)", url, err)
+				continue
 			}
 
 			prerequisiteMarkdown := parsers.ParseMarkdownIntoAst(prerequisiteSource)

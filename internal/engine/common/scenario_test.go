@@ -228,3 +228,26 @@ func TestVariableOverrides(t *testing.T) {
 		)
 	})
 }
+
+func TestMissingPrerequisiteDoesNotFailScenarioCreation(t *testing.T) {
+	// Create a scenario markdown that includes a prerequisites section referencing
+	// one existing and one missing markdown file. The missing file should not cause
+	// CreateScenarioFromMarkdown to return an error.
+	existingPrereqContent := "# Existing Prereq\n\n```bash\nexport PREREQ_RAN=1\n```\n"
+	existingPrereqFile, err := os.CreateTemp("", "existing-prereq-*.md")
+	if err != nil { t.Fatalf("failed to create temp prereq file: %v", err) }
+	defer os.Remove(existingPrereqFile.Name())
+	if _, err := existingPrereqFile.WriteString(existingPrereqContent); err != nil { t.Fatalf("failed to write prereq file: %v", err) }
+	existingPrereqFile.Close()
+
+	scenarioContent := "# Scenario With Missing Prereq\n\n## Prerequisites\n- [Existing](" + filepath.Base(existingPrereqFile.Name()) + ")\n- [Missing](definitely-missing.md)\n\n## Validate\n\n```bash\nif [ -n \"$PREREQ_RAN\" ]; then\n  echo \"OK\"\nelse\n  echo \"NOT OK\"\nfi\n```\n"
+	scenarioFile, err := os.CreateTemp("", "scenario-missing-prereq-*.md")
+	if err != nil { t.Fatalf("failed to create scenario file: %v", err) }
+	defer os.Remove(scenarioFile.Name())
+	if _, err := scenarioFile.WriteString(scenarioContent); err != nil { t.Fatalf("failed to write scenario file: %v", err) }
+	scenarioFile.Close()
+
+	scenario, err := CreateScenarioFromMarkdown(scenarioFile.Name(), []string{"bash"}, nil)
+	if err != nil { t.Fatalf("expected no error creating scenario, got: %v", err) }
+	if scenario == nil { t.Fatalf("expected scenario object, got nil") }
+}

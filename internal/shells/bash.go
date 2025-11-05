@@ -54,6 +54,11 @@ func executeBashCommandImpl(
 	command string,
 	config BashCommandConfiguration,
 ) (CommandOutput, error) {
+	// Normalize line endings to avoid Bash parsing issues (e.g. unexpected EOF) when
+	// markdown files use Windows CRLF. This ensures multi-line constructs like if/fi
+	// are interpreted correctly.
+	command = strings.ReplaceAll(command, "\r\n", "\n")
+	command = strings.ReplaceAll(command, "\r", "\n")
 	commandWithStateSaved := []string{
 		"set -e",
 		command,
