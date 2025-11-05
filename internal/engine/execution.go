@@ -106,6 +106,20 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 		azureStatus.CurrentStep = stepNumber + 1
 
 		for _, block := range step.CodeBlocks {
+			// Render any descriptive markdown paragraphs that appeared immediately
+			// before this code block in the source document. These are parsed into
+			// CodeBlock.Description by the markdown parser. We always show them in
+			// execute mode to preserve narrative context (not just in verbose).
+			if strings.TrimSpace(block.Description) != "" {
+				descLines := strings.Split(block.Description, "\n")
+				for _, line := range descLines {
+					// Indent to align with command blocks for visual grouping.
+					fmt.Printf("    %s\n", ui.VerboseStyle.Render(line))
+				}
+				// Blank line separating description from the command that follows.
+				fmt.Println()
+			}
+
 			var finalCommandOutput string
 			if e.Configuration.RenderValues {
 				// Render the codeblock.
