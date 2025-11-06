@@ -1,7 +1,9 @@
 package logging
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -77,4 +79,55 @@ func Init(level Level) {
 		GlobalLogger.SetOutput(os.Stdout)
 		GlobalLogger.Warn("Failed to log to file, using default stderr")
 	}
+
+	// Add a hook to always echo warnings to the console in orange so they are visible
+	GlobalLogger.AddHook(&warnConsoleHook{})
+}
+
+// warnConsoleHook duplicates warning messages to stderr with an orange color.
+// This allows visibility of warnings even when primary log output is a file.
+type warnConsoleHook struct{}
+
+func (h *warnConsoleHook) Levels() []logrus.Level {
+	return []logrus.Level{logrus.WarnLevel}
+}
+
+func (h *warnConsoleHook) Fire(entry *logrus.Entry) error {
+	color := "\x1b[33m" // fallback yellow
+	reset := "\x1b[0m"
+	// Prefer a 256-color orange if the terminal likely supports it.
+	if supports256Color() {
+		color = "\x1b[38;5;208m" // orange
+	}
+
+	// Reconstruct a simple field string (key=value) if present.
+	var fieldParts []string
+	for k, v := range entry.Data {
+		fieldParts = append(fieldParts, k+"="+toString(v))
+	}
+	fields := ""
+	if len(fieldParts) > 0 {
+		fields = " (" + strings.Join(fieldParts, ", ") + ")"
+	}
+
+	// Write to stderr directly.
+	fmtStr := color + "WARNING: " + entry.Message + fields + reset + "\n"
+	_, _ = os.Stderr.WriteString(fmtStr)
+	return nil
+}
+
+func supports256Color() bool {
+	// Basic heuristic for 256-color support.
+	term := os.Getenv("TERM")
+	if strings.Contains(term, "256color") || strings.Contains(os.Getenv("COLORTERM"), "truecolor") {
+		return true
+	}
+	return false
+}
+
+func toString(v interface{}) string {
+	if v == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("%v", v)
 }

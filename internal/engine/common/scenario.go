@@ -145,13 +145,18 @@ func CreateScenarioFromMarkdown(
 			}
 			// Explicit pre-check for local file existence to avoid bubbling up an error.
 			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") && !fs.FileExists(url) {
-				logging.GlobalLogger.Warnf("Prerequisite '%s' not found (continuing without it)", url)
+				msg := fmt.Sprintf("Prerequisite '%s' not found (continuing without it)", url)
+				logging.GlobalLogger.Warn(msg)
+				// Also surface directly to the console so users running with file-based logging still see it.
+				fmt.Fprintf(os.Stderr, "WARNING: %s\n", msg)
 				continue
 			}
 			prerequisiteSource, err := resolveMarkdownSource(url)
 			if err != nil {
-				// Requirement: When a prerequisite document is not found output a warning and continue.
-				logging.GlobalLogger.Warnf("Prerequisite '%s' could not be loaded: %v (continuing without it)", url, err)
+				// When a prerequisite document is not found or cannot be loaded output a warning and continue.
+				msg := fmt.Sprintf("Prerequisite '%s' could not be loaded: %v (continuing without it)", url, err)
+				logging.GlobalLogger.Warn(msg)
+				fmt.Fprintf(os.Stderr, "WARNING: %s\n", msg)
 				continue
 			}
 
