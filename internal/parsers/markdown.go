@@ -263,7 +263,8 @@ func ExtractPrerequisiteUrlsFromAst(node ast.Node, source []byte) ([]string, err
 	})
 
 	if len(urls) == 0 {
-		return nil, fmt.Errorf("no URLs found in the Prerequisites section")
+		logging.GlobalLogger.Debugf("No URLs found in the Prerequisites section")
+		return nil, nil
 	} else {
 		logging.GlobalLogger.Debugf("Found %d URLs in the Prerequisites section", len(urls))
 	}

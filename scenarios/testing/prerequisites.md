@@ -11,6 +11,8 @@ The following prerequisite documents will be executed before validation. One exi
 
 ## Validate Prerequisites Ran
 
+If the prerequiste succeeded then the environment variable `PREREQ_RAN` will have been set.
+
 ```bash
 if [ -n "$PREREQ_RAN" ]; then
     echo "Prerequisites Ran"
@@ -18,6 +20,8 @@ else
     echo "FAILURE: Prerequisites did not run"
 fi
 ```
+
+If succesful you will see:
 
 <!-- expected_similarity=".*Ran.*" -->
 ```text

@@ -139,7 +139,8 @@ func CreateScenarioFromMarkdown(
 	prerequisiteUrls, err := parsers.ExtractPrerequisiteUrlsFromAst(markdown, source)
 	if err == nil && len(prerequisiteUrls) > 0 {
 		for _, url := range prerequisiteUrls {
-			logging.GlobalLogger.Infof("Executing prerequisite: %s", url)
+			// Load the prerequisite markdown and wrap its execution with start/end messages.
+			logging.GlobalLogger.Infof("Preparing to execute prerequisite: %s", url)
 			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 				url = filepath.Join(filepath.Dir(path), url)
 			}
@@ -161,6 +162,12 @@ func CreateScenarioFromMarkdown(
 			}
 
 			prerequisiteMarkdown := parsers.ParseMarkdownIntoAst(prerequisiteSource)
+			// Attempt to extract a title for the prerequisite document; fallback to filename/URL.
+			prereqTitle, titleErr := parsers.ExtractScenarioTitleFromAst(prerequisiteMarkdown, prerequisiteSource)
+			if titleErr != nil || prereqTitle == "" {
+				prereqTitle = filepath.Base(url)
+			}
+			logging.GlobalLogger.Infof("Executing Prerequisite: %s", prereqTitle)
 			prerequisiteProperties := parsers.ExtractYamlMetadataFromAst(prerequisiteMarkdown)
 			for key, value := range prerequisiteProperties {
 				properties[key] = value
@@ -172,6 +179,17 @@ func CreateScenarioFromMarkdown(
 			}
 
 			prerequisiteCodeBlocks := parsers.ExtractCodeBlocksFromAst(prerequisiteMarkdown, prerequisiteSource, languagesToExecute)
+			// Inject start and end echo statements as bash code blocks for console visibility.
+			startEcho := parsers.CodeBlock{
+				Language: "bash",
+				Header:   "Prerequisites",
+				Content:  fmt.Sprintf("echo \"Executing Prerequisite: %s\"\n", prereqTitle),
+			}
+			endEcho := parsers.CodeBlock{
+				Language: "bash",
+				Header:   "Prerequisites",
+				Content:  fmt.Sprintf("echo \"%s Execution Completed\"\n", prereqTitle),
+			}
 
 			// Split existing codeBlocks into before and after prerequisites
 			var beforePrerequisites, afterPrerequisites []parsers.CodeBlock
@@ -185,8 +203,10 @@ func CreateScenarioFromMarkdown(
 				}
 			}
 
-			// recombine all codeblocks in the correct order of execution
-			codeBlocks = append(beforePrerequisites, prerequisiteCodeBlocks...)
+			// recombine all codeblocks in the correct order of execution with start/end markers
+			codeBlocks = append(beforePrerequisites, startEcho)
+			codeBlocks = append(codeBlocks, prerequisiteCodeBlocks...)
+			codeBlocks = append(codeBlocks, endEcho)
 			codeBlocks = append(codeBlocks, afterPrerequisites...)
 		}
 	} else {
