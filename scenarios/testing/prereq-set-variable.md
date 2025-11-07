@@ -29,3 +29,17 @@ If the similarity test fails then the main content of this document will be exec
 Prerequisite already executed
 ```
 
+The validation section will fast-fail. That is, as soon as a failure is detected it is assumed
+that the entire document needs to be executed. When the previous test will have failed, the
+following will not be executed:
+
+```bash
+echo "This test will fail too, but if the first fails this will never run."
+```
+
+Giving an output of:
+
+<!-- expected_similarity="Forced failure." -->
+```text
+This test will fail too, but if the first fails this will never run.
+```

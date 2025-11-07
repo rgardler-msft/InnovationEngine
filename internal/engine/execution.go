@@ -82,6 +82,7 @@ func renderCommand(blockContent string) (shells.CommandOutput, error) {
 func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]string) error {
 	var resourceGroupName string = ""
 	azureStatus := environments.NewAzureDeploymentStatus()
+	failedVerificationMarkers := make(map[string]bool)
 
 	err := az.SetSubscription(e.Configuration.Subscription)
 	if err != nil {
@@ -124,6 +125,10 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 			markerValue := ""
 			if hasAutoMeta {
 				markerValue = autoMeta["marker"]
+			}
+
+			if isVerificationBlock && markerValue != "" && failedVerificationMarkers[markerValue] {
+				continue
 			}
 
 			commandContent := block.Content
@@ -277,6 +282,9 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 
 							if outputComparisonError != nil {
 								if isVerificationBlock {
+									if markerValue != "" {
+										failedVerificationMarkers[markerValue] = true
+									}
 									fmt.Print("\r    \n")
 									terminal.MoveCursorPositionDown(lines)
 									renderExpectedActual(
@@ -350,6 +358,9 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 							logging.GlobalLogger.Errorf("Error executing command: %s", commandErr.Error())
 
 							if isVerificationBlock {
+								if markerValue != "" {
+									failedVerificationMarkers[markerValue] = true
+								}
 								logging.GlobalLogger.Warnf("Verification command execution failed for %s", autoMeta["display"])
 								break renderingLoop
 							}

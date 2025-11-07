@@ -18,3 +18,8 @@ This will always pass and thus this prerequisite should never run.
 ```bash
 echo "Validated prerequisite already satisfied"
 ```
+
+<!-- expected_similarity = 1.0 -->
+```text
+Validated prerequisite already satisfied
+```
