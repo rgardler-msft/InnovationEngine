@@ -235,19 +235,89 @@ func TestMissingPrerequisiteDoesNotFailScenarioCreation(t *testing.T) {
 	// CreateScenarioFromMarkdown to return an error.
 	existingPrereqContent := "# Existing Prereq\n\n```bash\nexport PREREQ_RAN=1\n```\n"
 	existingPrereqFile, err := os.CreateTemp("", "existing-prereq-*.md")
-	if err != nil { t.Fatalf("failed to create temp prereq file: %v", err) }
+	if err != nil {
+		t.Fatalf("failed to create temp prereq file: %v", err)
+	}
 	defer os.Remove(existingPrereqFile.Name())
-	if _, err := existingPrereqFile.WriteString(existingPrereqContent); err != nil { t.Fatalf("failed to write prereq file: %v", err) }
+	if _, err := existingPrereqFile.WriteString(existingPrereqContent); err != nil {
+		t.Fatalf("failed to write prereq file: %v", err)
+	}
 	existingPrereqFile.Close()
 
 	scenarioContent := "# Scenario With Missing Prereq\n\n## Prerequisites\n- [Existing](" + filepath.Base(existingPrereqFile.Name()) + ")\n- [Missing](definitely-missing.md)\n\n## Validate\n\n```bash\nif [ -n \"$PREREQ_RAN\" ]; then\n  echo \"OK\"\nelse\n  echo \"NOT OK\"\nfi\n```\n"
 	scenarioFile, err := os.CreateTemp("", "scenario-missing-prereq-*.md")
-	if err != nil { t.Fatalf("failed to create scenario file: %v", err) }
+	if err != nil {
+		t.Fatalf("failed to create scenario file: %v", err)
+	}
 	defer os.Remove(scenarioFile.Name())
-	if _, err := scenarioFile.WriteString(scenarioContent); err != nil { t.Fatalf("failed to write scenario file: %v", err) }
+	if _, err := scenarioFile.WriteString(scenarioContent); err != nil {
+		t.Fatalf("failed to write scenario file: %v", err)
+	}
 	scenarioFile.Close()
 
 	scenario, err := CreateScenarioFromMarkdown(scenarioFile.Name(), []string{"bash"}, nil)
-	if err != nil { t.Fatalf("expected no error creating scenario, got: %v", err) }
-	if scenario == nil { t.Fatalf("expected scenario object, got nil") }
+	if err != nil {
+		t.Fatalf("expected no error creating scenario, got: %v", err)
+	}
+	if scenario == nil {
+		t.Fatalf("expected scenario object, got nil")
+	}
+}
+
+func TestPrerequisiteVerificationSkipWrapping(t *testing.T) {
+	// Create a prerequisite markdown with a passing verification section.
+	prereqContent := "# PreReq\n\n## Setup\n```bash\necho \"running setup\"\n```\n\n## Verification\n```bash\ntrue\n```\n"
+	prereqFile, err := os.CreateTemp("", "prereq-verification-*.md")
+	if err != nil {
+		t.Fatalf("failed to create temp prereq file: %v", err)
+	}
+	defer os.Remove(prereqFile.Name())
+	if _, err := prereqFile.WriteString(prereqContent); err != nil {
+		t.Fatalf("failed to write prereq file: %v", err)
+	}
+	prereqFile.Close()
+
+	// Scenario referencing the prerequisite.
+	scenarioContent := "# Scenario\n\n## Prerequisites\n- [PreReq](" + filepath.Base(prereqFile.Name()) + ")\n\n## Main\n```bash\necho \"main step\"\n```\n"
+	scenarioFile, err := os.CreateTemp("", "scenario-verification-*.md")
+	if err != nil {
+		t.Fatalf("failed to create scenario file: %v", err)
+	}
+	defer os.Remove(scenarioFile.Name())
+	if _, err := scenarioFile.WriteString(scenarioContent); err != nil {
+		t.Fatalf("failed to write scenario file: %v", err)
+	}
+	scenarioFile.Close()
+
+	scenario, err := CreateScenarioFromMarkdown(scenarioFile.Name(), []string{"bash"}, nil)
+	if err != nil {
+		t.Fatalf("expected no error creating scenario, got: %v", err)
+	}
+
+	// Scan code blocks for verification and wrapping markers.
+	verificationFound := false
+	markerFound := false
+	wrappedSetupFound := false
+	for _, step := range scenario.Steps {
+		for _, b := range step.CodeBlocks {
+			if b.Header == "Verification" && strings.Contains(b.Content, "Verifying prerequisite:") {
+				verificationFound = true
+				if strings.Contains(b.Content, "touch \"/tmp/prereq_") {
+					markerFound = true
+				}
+			}
+			if b.Header == "Prerequisites" && strings.Contains(b.Content, "running setup") && strings.Contains(b.Content, "if [ ! -f \"/tmp/prereq_") {
+				wrappedSetupFound = true
+			}
+		}
+	}
+	if !verificationFound {
+		t.Fatalf("expected a verification wrapper block to be present")
+	}
+	if !markerFound {
+		t.Fatalf("verification block does not create marker file")
+	}
+	if !wrappedSetupFound {
+		t.Fatalf("expected setup block to be conditionally wrapped to allow skipping")
+	}
 }

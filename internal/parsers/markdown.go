@@ -92,6 +92,7 @@ func ExtractCodeBlocksFromAst(
 	node ast.Node,
 	source []byte,
 	languagesToExtract []string,
+	sourceName string,
 ) []CodeBlock {
 	var lastHeader string
 	var commands []CodeBlock
@@ -100,6 +101,10 @@ func ExtractCodeBlocksFromAst(
 	var lastExpectedRegex *regexp.Regexp
 	var lastNode ast.Node
 	var currentParagraphs string
+
+	if sourceName == "" {
+		sourceName = "<unknown source>"
+	}
 
 	ast.Walk(node, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
 		if entering {
@@ -158,10 +163,10 @@ func ExtractCodeBlocksFromAst(
 					case *ast.Paragraph:
 						description = currentParagraphs
 					default:
-						logging.GlobalLogger.Warnf("The node before the codeblock `%s` is not a paragraph, it is a %s", content, n.Kind())
+						logging.GlobalLogger.Warnf("In %s the node before the codeblock `%s` is not a paragraph, it is a %s", sourceName, content, n.Kind())
 					}
 				} else {
-					logging.GlobalLogger.Warnf("There are no markdown elements before the last codeblock `%s`", content)
+					logging.GlobalLogger.Warnf("In %s there are no markdown elements before the last codeblock `%s`", sourceName, content)
 				}
 
 				currentParagraphs = ""
@@ -202,6 +207,46 @@ func ExtractCodeBlocksFromAst(
 	})
 
 	return commands
+}
+
+// ExtractSectionTextFromMarkdown returns the textual markdown content that immediately follows
+// a level 2 heading matching the provided sectionTitle. The returned text preserves the
+// original markdown formatting (paragraphs, lists, etc.) so it can be rendered verbatim to the
+// console before executing related code blocks.
+func ExtractSectionTextFromMarkdown(source []byte, sectionTitle string) string {
+	text := string(source)
+	if sectionTitle == "" {
+		return ""
+	}
+
+	headingPattern := fmt.Sprintf(`(?m)^##\s+%s\s*$`, regexp.QuoteMeta(sectionTitle))
+	headingRegex := regexp.MustCompile(headingPattern)
+	headingLoc := headingRegex.FindStringIndex(text)
+	if headingLoc == nil {
+		return ""
+	}
+
+	contentStart := headingLoc[1]
+	// Skip optional carriage return and newline characters.
+	if contentStart < len(text) && (text[contentStart] == '\r' || text[contentStart] == '\n') {
+		if text[contentStart] == '\r' {
+			contentStart++
+		}
+		if contentStart < len(text) && text[contentStart] == '\n' {
+			contentStart++
+		}
+	}
+
+	// Look for the next level 2 heading to determine the end of the section.
+	nextHeadingRegex := regexp.MustCompile(`(?m)^##\s+`)
+	nextHeadingLoc := nextHeadingRegex.FindStringIndex(text[contentStart:])
+	contentEnd := len(text)
+	if nextHeadingLoc != nil {
+		contentEnd = contentStart + nextHeadingLoc[0]
+	}
+
+	sectionText := strings.TrimSpace(text[contentStart:contentEnd])
+	return sectionText
 }
 
 // This regex matches HTML comments within markdown blocks that contain

@@ -3,6 +3,8 @@ package engine
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -24,6 +26,11 @@ const (
 	// spinnerFrames  = `⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`
 	spinnerFrames  = `-\|/`
 	spinnerRefresh = 100 * time.Millisecond
+)
+
+var (
+	autoPrereqCommentPattern  = regexp.MustCompile(`^#\s*ie:auto-prereq-([a-z-]+)\s+(.*)$`)
+	autoPrereqMetadataPattern = regexp.MustCompile(`([a-zA-Z0-9_-]+)="([^"]*)"`)
 )
 
 // If a scenario has an `az group delete` command and the `--do-not-delete`
@@ -85,6 +92,8 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 
 	stepsToExecute := filterDeletionCommands(steps, e.Configuration.DoNotDelete)
 
+	// Dynamic verification state removed (static banner approach).
+
 	for stepNumber, step := range stepsToExecute {
 
 		azureCodeBlocks := []environments.AzureCodeBlock{}
@@ -106,24 +115,85 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 		azureStatus.CurrentStep = stepNumber + 1
 
 		for _, block := range step.CodeBlocks {
+			blockType, autoMeta, hasAutoMeta := parseAutoPrereqMetadata(block.Content)
+			isBannerBlock := hasAutoMeta && blockType == "banner"
+			isVerificationBlock := hasAutoMeta && blockType == "verification"
+			isBodyBlock := hasAutoMeta && blockType == "body"
+
+			markerValue := ""
+			if hasAutoMeta {
+				markerValue = autoMeta["marker"]
+			}
+
+			commandContent := block.Content
+			if hasAutoMeta {
+				commandContent = stripAutoPrereqComment(commandContent)
+			}
+
+			// If this is a body block and the marker file exists (verification passed), skip rendering & execution entirely.
+			if isBodyBlock && markerValue != "" {
+				if _, err := os.Stat(markerValue); err == nil {
+					// Body is skipped; continue to next block without any output.
+					continue
+				}
+			}
+
+			displayContent := commandContent
+			if isBannerBlock {
+				displayContent = ""
+			}
+
+			blockToExecute := block
+			blockToExecute.Content = commandContent
+
+			// Remove any existing marker before starting verification blocks to ensure fresh evaluation.
+			if isVerificationBlock && markerValue != "" {
+				_ = os.Remove(markerValue)
+			}
+
 			// Render any descriptive markdown paragraphs that appeared immediately
 			// before this code block in the source document. These are parsed into
 			// CodeBlock.Description by the markdown parser. We always show them in
 			// execute mode to preserve narrative context (not just in verbose).
-			if strings.TrimSpace(block.Description) != "" {
-				descLines := strings.Split(block.Description, "\n")
-				for _, line := range descLines {
-					// Indent to align with command blocks for visual grouping.
-					fmt.Printf("    %s\n", ui.VerboseStyle.Render(line))
+			// Suppress body block description entirely if marker indicates skip.
+			markerPresent := false
+			if isBodyBlock && markerValue != "" {
+				if _, err := os.Stat(markerValue); err == nil {
+					markerPresent = true
 				}
-				// Blank line separating description from the command that follows.
-				fmt.Println()
+			}
+			if strings.TrimSpace(block.Description) != "" && !(isBodyBlock && markerPresent) {
+				descLines := strings.Split(block.Description, "\n")
+				// If we're no longer in the Prerequisites step, filter out any residual prerequisite list narrative.
+				if !strings.EqualFold(step.Name, "Prerequisites") {
+					filtered := []string{}
+					for _, l := range descLines {
+						trimmed := strings.TrimSpace(l)
+						if trimmed == "" { filtered = append(filtered, l); continue }
+						// Suppress lines that clearly belong to the prerequisites section narrative or list.
+						if strings.Contains(trimmed, "prerequisite documents will be executed before validation") ||
+							strings.HasPrefix(trimmed, "- [A prerequisite") ||
+							strings.HasPrefix(trimmed, "- [A prereuisite") ||
+							strings.HasPrefix(trimmed, "- [A prerequisite that is missing") {
+							continue
+						}
+						filtered = append(filtered, l)
+					}
+					descLines = filtered
+				}
+				printedAny := false
+				for _, line := range descLines {
+					if strings.TrimSpace(line) == "" && !printedAny { continue } // avoid leading blank lines
+					fmt.Printf("    %s\n", ui.VerboseStyle.Render(line))
+					printedAny = true
+				}
+				if printedAny { fmt.Println() }
 			}
 
 			var finalCommandOutput string
 			if e.Configuration.RenderValues {
 				// Render the codeblock.
-				renderedCommand, err := renderCommand(block.Content)
+				renderedCommand, err := renderCommand(commandContent)
 				if err != nil {
 					logging.GlobalLogger.Errorf("Failed to render command: %s", err.Error())
 					azureStatus.SetError(err)
@@ -132,11 +202,15 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 				}
 				finalCommandOutput = ui.IndentMultiLineCommand(renderedCommand.StdOut, 4)
 			} else {
-				finalCommandOutput = ui.IndentMultiLineCommand(block.Content, 4)
+				finalCommandOutput = ui.IndentMultiLineCommand(displayContent, 4)
+			}
+
+			if isBannerBlock {
+				finalCommandOutput = ""
 			}
 
 			// Debug/verbose working directory output before each command block.
-			if e.Configuration.Verbose || logging.GlobalLogger.GetLevel() <= logrus.DebugLevel {
+			if (e.Configuration.Verbose || logging.GlobalLogger.GetLevel() <= logrus.DebugLevel) && !isBannerBlock {
 				// Attempt to read persisted working directory state first; fall back to current process working directory.
 				workingDir, err := lib.LoadWorkingDirectoryStateFile(lib.DefaultWorkingDirectoryStateFile)
 				if err != nil || workingDir == "" {
@@ -150,7 +224,9 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 				logging.GlobalLogger.Debugf("Working directory before command: %s", workingDir)
 			}
 
-			fmt.Print("    " + finalCommandOutput)
+			if finalCommandOutput != "" {
+				fmt.Print("    " + finalCommandOutput)
+			}
 
 			// execute the command as a goroutine to allow for the spinner to be
 			// rendered while the command is executing.
@@ -160,12 +236,12 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 			// If the command is an SSH command, we need to forward the input and
 			// output
 			interactiveCommand := false
-			if patterns.SshCommand.MatchString(block.Content) {
+			if patterns.SshCommand.MatchString(commandContent) {
 				interactiveCommand = true
 			}
 
 			logging.GlobalLogger.WithField("isInteractive", interactiveCommand).
-				Infof("Executing command: %s", block.Content)
+				Infof("Executing command: %s", commandContent)
 
 			var commandErr error
 			var frame int = 0
@@ -196,7 +272,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 					logging.GlobalLogger.Infof("Command output to stderr:\n %s", output.StdErr)
 					commandOutput = output
 					done <- err
-				}(block)
+				}(blockToExecute)
 			renderingLoop:
 				// While the command is executing, render the spinner.
 				for {
@@ -217,11 +293,24 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 							_, outputComparisonError := common.CompareCommandOutputs(actualOutput, expectedOutput, expectedSimilarity, expectedRegex, expectedOutputLanguage)
 
 							if outputComparisonError != nil {
+								if isVerificationBlock {
+									fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
+									terminal.MoveCursorPositionDown(lines)
+									fmt.Printf("  %s\n", ui.ErrorMessageStyle.Render(outputComparisonError.Error()))
+									diff := lib.GetDifferenceBetweenStrings(block.ExpectedOutput.Content, commandOutput.StdOut)
+									if strings.TrimSpace(diff) != "" {
+										fmt.Printf("    %s\n", diff)
+									}
+									// Suppress noisy warning log for expected verification failure; body will execute.
+									// Failure means body should execute; marker stays absent.
+									break renderingLoop
+								}
+
 								logging.GlobalLogger.Errorf("Error comparing command outputs: %s", outputComparisonError.Error())
 								fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
 								terminal.MoveCursorPositionDown(lines)
 								fmt.Printf("  %s\n", ui.ErrorMessageStyle.Render(outputComparisonError.Error()))
-								fmt.Printf("	%s\n", lib.GetDifferenceBetweenStrings(block.ExpectedOutput.Content, commandOutput.StdOut))
+								fmt.Printf("    %s\n", lib.GetDifferenceBetweenStrings(block.ExpectedOutput.Content, commandOutput.StdOut))
 
 								azureStatus.SetError(outputComparisonError)
 								environments.AttachResourceURIsToAzureStatus(
@@ -234,14 +323,24 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 								return outputComparisonError
 							}
 
-							fmt.Printf("\r  %s \n", ui.CheckStyle.Render("✔"))
+							// Suppress final success tick per UI refinement request.
+							fmt.Printf("\r    \n")
 							terminal.MoveCursorPositionDown(lines)
 
-							fmt.Printf("%s\n", ui.RemoveHorizontalAlign(ui.VerboseStyle.Render(commandOutput.StdOut)))
+							if strings.TrimSpace(commandOutput.StdOut) != "" {
+								fmt.Printf("%s\n", ui.RemoveHorizontalAlign(ui.VerboseStyle.Render(commandOutput.StdOut)))
+							}
+
+							// For a successful verification, create marker immediately (static banner will reflect outcome).
+							if isVerificationBlock && markerValue != "" {
+								if err := writePrereqMarker(markerValue, autoMeta["display"]); err != nil {
+									logging.GlobalLogger.Warnf("Failed to write marker %s: %v", markerValue, err)
+								}
+							}
 
 							// Extract the resource group name from the command output if
 							// it's not already set.
-							if resourceGroupName == "" && patterns.AzCommand.MatchString(block.Content) {
+							if resourceGroupName == "" && patterns.AzCommand.MatchString(commandContent) {
 								logging.GlobalLogger.Info("Attempting to extract resource group name from command output")
 								tmpResourceGroup := az.FindResourceGroupName(commandOutput.StdOut)
 								if tmpResourceGroup != "" {
@@ -256,12 +355,16 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 							}
 
 						} else {
-							terminal.ShowCursor()
 							fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
 							terminal.MoveCursorPositionDown(lines)
 							fmt.Printf("  %s\n", ui.ErrorMessageStyle.Render(commandErr.Error()))
 
 							logging.GlobalLogger.Errorf("Error executing command: %s", commandErr.Error())
+
+							if isVerificationBlock {
+								logging.GlobalLogger.Warnf("Verification command execution failed for %s", autoMeta["display"])
+								break renderingLoop
+							}
 
 							azureStatus.SetError(commandErr)
 							environments.AttachResourceURIsToAzureStatus(
@@ -282,19 +385,19 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 					}
 				}
 			} else {
-				lines := strings.Count(block.Content, "\n")
+				lines := strings.Count(displayContent, "\n")
 
 				// If we're on the last step and the command is an SSH command, we need
 				// to report the status before executing the command. This is needed for
 				// one click deployments and does not affect the normal execution flow.
-				if stepNumber == len(stepsToExecute)-1 && patterns.SshCommand.MatchString(block.Content) {
+				if stepNumber == len(stepsToExecute)-1 && patterns.SshCommand.MatchString(commandContent) {
 					azureStatus.Status = "Succeeded"
 					environments.AttachResourceURIsToAzureStatus(&azureStatus, resourceGroupName, e.Configuration.Environment)
 					environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
 				}
 
 				output, commandExecutionError := shells.ExecuteBashCommand(
-					block.Content,
+					blockToExecute.Content,
 					shells.BashCommandConfiguration{
 						EnvironmentVariables: lib.CopyMap(env),
 						InheritEnvironment:   true,
@@ -306,10 +409,13 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 				terminal.ShowCursor()
 
 				if commandExecutionError == nil {
-					fmt.Printf("\r  %s \n", ui.CheckStyle.Render("✔"))
+					// Suppress final success tick per UI refinement request.
+					fmt.Printf("\r    \n")
 					terminal.MoveCursorPositionDown(lines)
 
-					fmt.Printf("  %s\n", ui.VerboseStyle.Render(output.StdOut))
+					if strings.TrimSpace(output.StdOut) != "" {
+						fmt.Printf("  %s\n", ui.VerboseStyle.Render(output.StdOut))
+					}
 
 					if stepNumber != len(stepsToExecute)-1 {
 						environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
@@ -319,11 +425,18 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 					terminal.MoveCursorPositionDown(lines)
 					fmt.Printf("  %s\n", ui.ErrorMessageStyle.Render(commandExecutionError.Error()))
 
-					azureStatus.SetError(commandExecutionError)
-					environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
-					return commandExecutionError
+					if isVerificationBlock {
+						logging.GlobalLogger.Warnf("Verification command execution failed for %s", autoMeta["display"])
+						// Failure means marker not written; body may still execute later.
+					} else {
+						azureStatus.SetError(commandExecutionError)
+						environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
+						return commandExecutionError
+					}
 				}
 			}
+
+			// No dynamic messaging post-verification (static banners handle status).
 		}
 	}
 
@@ -362,4 +475,55 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 	}
 
 	return nil
+}
+
+func parseAutoPrereqMetadata(content string) (string, map[string]string, bool) {
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		return "", nil, false
+	}
+
+	firstLine := strings.TrimSpace(lines[0])
+	matches := autoPrereqCommentPattern.FindStringSubmatch(firstLine)
+	if len(matches) != 3 {
+		return "", nil, false
+	}
+
+	metadata := make(map[string]string)
+	for _, match := range autoPrereqMetadataPattern.FindAllStringSubmatch(matches[2], -1) {
+		if len(match) != 3 {
+			continue
+		}
+		metadata[match[1]] = match[2]
+	}
+
+	return matches[1], metadata, true
+}
+
+func stripAutoPrereqComment(content string) string {
+	if _, _, hasMetadata := parseAutoPrereqMetadata(content); !hasMetadata {
+		return content
+	}
+
+	parts := strings.SplitN(content, "\n", 2)
+	if len(parts) < 2 {
+		return ""
+	}
+
+	return parts[1]
+}
+
+func writePrereqMarker(markerPath, display string) error {
+	if strings.TrimSpace(markerPath) == "" {
+		return nil
+	}
+
+	dir := filepath.Dir(markerPath)
+	if dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+
+	return os.WriteFile(markerPath, []byte(display), 0o600)
 }

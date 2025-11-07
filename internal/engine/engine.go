@@ -48,6 +48,14 @@ func (e *Engine) ExecuteScenario(scenario *common.Scenario) error {
 
 		// Execute the steps
 		fmt.Println(ui.ScenarioTitleStyle.Render(scenario.Name))
+		intro := strings.TrimSpace(scenario.IntroText)
+		if intro != "" {
+			fmt.Println()
+			for _, line := range strings.Split(intro, "\n") {
+				fmt.Println(ui.VerboseStyle.Render(line))
+			}
+			fmt.Println()
+		}
 		err := e.ExecuteAndRenderSteps(scenario.Steps, lib.CopyMap(scenario.Environment))
 		return err
 	})

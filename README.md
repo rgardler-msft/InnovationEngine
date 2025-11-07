@@ -119,6 +119,21 @@ Documentation does not need to be stored locally in order to run IE with it. Wit
 
 https://github.com/Azure/InnovationEngine/assets/55719566/ce37f53c-9876-42b9-a033-1e4acaeb9d50
 
+## Prerequisite Validation Workflow
+
+Executable documents often reference additional markdown prerequisites. Innovation Engine now validates those prerequisites before it executes their setup commands:
+
+- The engine scans the `Prerequisites` section of a document and, for each linked markdown file, runs a verification block (the code under the `## Verification` heading) before any body commands.
+- Verification success writes a marker file (`/tmp/prereq_<slug>_skip`) and surfaces a `Validating Prerequisite` banner in the console; when the marker exists the prerequisite body is skipped so you do not re-run work a user already satisfied.
+- Verification failure removes the marker, prints `Executing Prerequisite`, and runs the prerequisite body commands so the document can install or configure the missing dependency.
+- Narrative text that introduced the prerequisites is rendered once—between the scenario title and step headings—so instructions stay visible even when the body is skipped.
+
+Authoring tips:
+
+- Keep prerequisite intent and checks under a `## Verification` heading; the engine reuses the original subheadings in console descriptions so keep them meaningful.
+- Place installation or configuration commands outside the `## Verification` section so they run only when required.
+- When you need idempotent shell logic inside the body, wrap it in your own guard clauses; the engine will already prevent execution once verification passes, but defensive scripting keeps the document reliable when run manually.
+
 ## Use Executable documentation for Automated Testing
 One of the core benefits of executable documentation is the ability to run 
 automated testing on markdown file. This can be used to ensure freshness of 

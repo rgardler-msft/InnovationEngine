@@ -2,6 +2,7 @@ package parsers
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 )
 
@@ -106,7 +107,7 @@ func TestParsingMarkdownCodeBlocks(t *testing.T) {
 		markdown := []byte(fmt.Sprintf("# Hello World\n ```bash\n%s\n```", "echo Hello"))
 
 		document := ParseMarkdownIntoAst(markdown)
-		codeBlocks := ExtractCodeBlocksFromAst(document, markdown, []string{"bash"})
+		codeBlocks := ExtractCodeBlocksFromAst(document, markdown, []string{"bash"}, "test.md")
 
 		if len(codeBlocks) != 1 {
 			t.Errorf("Code block count is wrong: %d", len(codeBlocks))
@@ -136,7 +137,7 @@ func TestParsingMarkdownExpectedSimilarty(t *testing.T) {
 		)
 
 		document := ParseMarkdownIntoAst(markdown)
-		codeBlocks := ExtractCodeBlocksFromAst(document, markdown, []string{"bash"})
+		codeBlocks := ExtractCodeBlocksFromAst(document, markdown, []string{"bash"}, "test.md")
 
 		if len(codeBlocks) != 1 {
 			t.Errorf("Code block count is wrong: %d", len(codeBlocks))
@@ -164,7 +165,7 @@ func TestParsingMarkdownExpectedRegex(t *testing.T) {
 		)
 
 		document := ParseMarkdownIntoAst(markdown)
-		codeBlocks := ExtractCodeBlocksFromAst(document, markdown, []string{"bash"})
+		codeBlocks := ExtractCodeBlocksFromAst(document, markdown, []string{"bash"}, "test.md")
 
 		if len(codeBlocks) != 1 {
 			t.Errorf("Code block count is wrong: %d", len(codeBlocks))
@@ -181,4 +182,29 @@ func TestParsingMarkdownExpectedRegex(t *testing.T) {
 			t.Errorf("ExpectedRegex is wrong, got %q, expected %q", stringRegex, expectedRegex)
 		}
 	})
+}
+
+func TestExtractSectionTextFromMarkdown(t *testing.T) {
+	markdown := []byte(`# Title
+
+Intro paragraph.
+
+## Prerequisites
+
+This is the prerequisites section.
+
+- Item one
+- Item two
+
+## Next Section
+
+More text.
+`)
+
+	section := ExtractSectionTextFromMarkdown(markdown, "Prerequisites")
+
+	expectedPattern := `(?s)^This is the prerequisites section\.\s+- Item one\s+- Item two$`
+	if match, _ := regexp.MatchString(expectedPattern, section); !match {
+		t.Fatalf("Section text did not match expected content. Got: %q", section)
+	}
 }

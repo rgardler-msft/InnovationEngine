@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/Azure/InnovationEngine/internal/lib"
@@ -25,6 +26,7 @@ type Step struct {
 // Scenarios are the top-level object that represents a scenario to be executed.
 type Scenario struct {
 	Name        string
+	IntroText   string
 	MarkdownAst ast.Node
 	Steps       []Step
 	Properties  map[string]interface{}
@@ -56,6 +58,58 @@ func groupCodeBlocksIntoSteps(blocks []parsers.CodeBlock) []Step {
 	}
 
 	return groupedSteps
+}
+
+func extractIntroTextBeforeSection(source []byte, sectionTitle string) string {
+	if len(sectionTitle) == 0 {
+		return ""
+	}
+
+	text := strings.ReplaceAll(string(source), "\r\n", "\n")
+	marker := "\n## " + sectionTitle
+	idx := strings.Index(text, marker)
+	if idx == -1 {
+		return ""
+	}
+
+	intro := strings.TrimSpace(text[:idx])
+	lines := strings.Split(intro, "\n")
+	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+		lines = lines[1:]
+	}
+	if len(lines) > 0 && strings.HasPrefix(strings.TrimSpace(lines[0]), "#") {
+		lines = lines[1:]
+		for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+			lines = lines[1:]
+		}
+	}
+	intro = strings.TrimSpace(strings.Join(lines, "\n"))
+	return intro
+}
+
+func stripTextFromFirstDescription(blocks []parsers.CodeBlock, text string) []parsers.CodeBlock {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return blocks
+	}
+
+	for i := range blocks {
+		desc := blocks[i].Description
+		if strings.TrimSpace(desc) == "" {
+			continue
+		}
+
+		newDesc := strings.Replace(desc, text, "", 1)
+		if newDesc == desc {
+			newDesc = strings.Replace(desc, trimmed, "", 1)
+		}
+		if newDesc != desc {
+			blocks[i].Description = strings.TrimSpace(newDesc)
+			break
+		}
+	}
+
+	return blocks
 }
 
 // Download the scenario markdown over http
@@ -130,9 +184,13 @@ func CreateScenarioFromMarkdown(
 	}
 
 	// Extract the code blocks from the markdown file.
-	codeBlocks := parsers.ExtractCodeBlocksFromAst(markdown, source, languagesToExecute)
+	codeBlocks := parsers.ExtractCodeBlocksFromAst(markdown, source, languagesToExecute, path)
 	logging.GlobalLogger.WithField("CodeBlocks", codeBlocks).
 		Debugf("Found %d code blocks", len(codeBlocks))
+
+	prerequisiteSectionText := parsers.ExtractSectionTextFromMarkdown(source, "Prerequisites")
+	prerequisiteSectionUsed := false
+	introText := extractIntroTextBeforeSection(source, "Prerequisites")
 
 	// Extract the URLs of any prerequisite documents linked from the markdown file.
 	// TODO: This is a bit of a hack. Should be refactored to remove duplication. Use recursion.
@@ -148,8 +206,6 @@ func CreateScenarioFromMarkdown(
 			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") && !fs.FileExists(url) {
 				msg := fmt.Sprintf("Prerequisite '%s' not found (continuing without it)", url)
 				logging.GlobalLogger.Warn(msg)
-				// Also surface directly to the console so users running with file-based logging still see it.
-				fmt.Fprintf(os.Stderr, "WARNING: %s\n", msg)
 				continue
 			}
 			prerequisiteSource, err := resolveMarkdownSource(url)
@@ -157,7 +213,6 @@ func CreateScenarioFromMarkdown(
 				// When a prerequisite document is not found or cannot be loaded output a warning and continue.
 				msg := fmt.Sprintf("Prerequisite '%s' could not be loaded: %v (continuing without it)", url, err)
 				logging.GlobalLogger.Warn(msg)
-				fmt.Fprintf(os.Stderr, "WARNING: %s\n", msg)
 				continue
 			}
 
@@ -167,7 +222,8 @@ func CreateScenarioFromMarkdown(
 			if titleErr != nil || prereqTitle == "" {
 				prereqTitle = filepath.Base(url)
 			}
-			logging.GlobalLogger.Infof("Executing Prerequisite: %s", prereqTitle)
+			prereqDisplay := fmt.Sprintf("%s [%s]", prereqTitle, filepath.Base(url))
+			logging.GlobalLogger.Infof("Executing Prerequisite: %s", prereqDisplay)
 			prerequisiteProperties := parsers.ExtractYamlMetadataFromAst(prerequisiteMarkdown)
 			for key, value := range prerequisiteProperties {
 				properties[key] = value
@@ -178,23 +234,25 @@ func CreateScenarioFromMarkdown(
 				environmentVariables[key] = value
 			}
 
-			prerequisiteCodeBlocks := parsers.ExtractCodeBlocksFromAst(prerequisiteMarkdown, prerequisiteSource, languagesToExecute)
-			// Inject start and end echo statements as bash code blocks for console visibility.
-			startEcho := parsers.CodeBlock{
-				Language: "bash",
-				Header:   "Prerequisites",
-				Content:  fmt.Sprintf("echo \"Executing Prerequisite: %s\"\n", prereqTitle),
-			}
-			endEcho := parsers.CodeBlock{
-				Language: "bash",
-				Header:   "Prerequisites",
-				Content:  fmt.Sprintf("echo \"%s Execution Completed\"\n", prereqTitle),
+			prerequisiteCodeBlocks := parsers.ExtractCodeBlocksFromAst(prerequisiteMarkdown, prerequisiteSource, languagesToExecute, url)
+
+			// Partition prerequisite code blocks into verification and non-verification blocks.
+			var verificationBlocks, nonVerificationBlocks []parsers.CodeBlock
+			for _, b := range prerequisiteCodeBlocks {
+				if strings.EqualFold(b.Header, "Verification") {
+					verificationBlocks = append(verificationBlocks, b)
+				} else {
+					nonVerificationBlocks = append(nonVerificationBlocks, b)
+				}
 			}
 
-			// Split existing codeBlocks into before and after prerequisites
+			// Generate a slug for this prerequisite title to create unique marker file paths.
+			slug := strings.ToLower(prereqTitle)
+			// Replace any non-alphanumeric characters with underscores to create a safe slug.
+			slug = regexp.MustCompile("[^a-z0-9]+").ReplaceAllString(slug, "_")
+			markerFile := fmt.Sprintf("/tmp/prereq_%s_skip", slug)
+
 			var beforePrerequisites, afterPrerequisites []parsers.CodeBlock
-
-			// TODO: Need to use prerequisite header on prereq code blocks
 			for _, block := range codeBlocks {
 				if block.Header == "Prerequisites" {
 					beforePrerequisites = append(beforePrerequisites, block)
@@ -203,10 +261,75 @@ func CreateScenarioFromMarkdown(
 				}
 			}
 
-			// recombine all codeblocks in the correct order of execution with start/end markers
-			codeBlocks = append(beforePrerequisites, startEcho)
-			codeBlocks = append(codeBlocks, prerequisiteCodeBlocks...)
-			codeBlocks = append(codeBlocks, endEcho)
+			// Remove intro/prerequisite narrative from subsequent code blocks since we'll surface it on the banner.
+			afterPrerequisites = stripTextFromFirstDescription(afterPrerequisites, introText)
+			afterPrerequisites = stripTextFromFirstDescription(afterPrerequisites, prerequisiteSectionText)
+
+			var rebuiltPrereqBlocks []parsers.CodeBlock
+
+			// 1. Validation banner first so users see we're validating before running verification code.
+			validationBanner := parsers.CodeBlock{
+				Language: "bash",
+				Header:   "Prerequisites",
+				Content:  fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\necho \"Validating Prerequisite: %s\"\n", markerFile, prereqDisplay, prereqDisplay),
+			}
+			descriptionParts := []string{}
+			if !prerequisiteSectionUsed && strings.TrimSpace(prerequisiteSectionText) != "" {
+				descriptionParts = append(descriptionParts, strings.TrimSpace(prerequisiteSectionText))
+				prerequisiteSectionUsed = true
+			}
+			if len(descriptionParts) > 0 {
+				validationBanner.Description = strings.Join(descriptionParts, "\n\n")
+			}
+			rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, validationBanner)
+
+			// 2. Verification blocks so their output appears after the validation banner.
+			// Preserve original subheading by injecting it into Description while forcing Header to 'Prerequisites'.
+			for i, vb := range verificationBlocks {
+				annotated := vb
+				metadata := fmt.Sprintf("# ie:auto-prereq-verification marker=\"%s\" display=\"%s\" index=\"%d\" total=\"%d\"\n", markerFile, prereqDisplay, i+1, len(verificationBlocks))
+				annotated.Content = metadata + vb.Content
+				originalHeader := annotated.Header
+				annotated.Header = "Prerequisites"
+				if originalHeader != "" && !strings.EqualFold(originalHeader, "Prerequisites") {
+					if strings.TrimSpace(annotated.Description) != "" {
+						annotated.Description = fmt.Sprintf("%s\n\n%s", originalHeader, annotated.Description)
+					} else {
+						annotated.Description = originalHeader
+					}
+				}
+				rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, annotated)
+			}
+
+			// 3. Static decision banner (skip or execute) based on marker file written by any successful verification.
+			decisionBanner := parsers.CodeBlock{
+				Language: "bash",
+				Header:   "Prerequisites",
+				Content:  fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\nif [ -f \"%s\" ]; then echo \"Skipping Prerequisite: %s (verification passed)\"; else echo \"Executing Prerequisite: %s\"; fi\n", markerFile, prereqDisplay, markerFile, prereqDisplay, prereqDisplay),
+			}
+			rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, decisionBanner)
+
+			// 4. Non-verification prerequisite body wrapped so it only runs when marker absent.
+			for i := range nonVerificationBlocks {
+				wrapped := fmt.Sprintf("# ie:auto-prereq-body marker=\"%s\" display=\"%s\"\nif [ ! -f \"%s\" ]; then\n%s\nfi\n", markerFile, prereqDisplay, markerFile, nonVerificationBlocks[i].Content)
+				nonVerificationBlocks[i].Content = wrapped
+				originalHeader := nonVerificationBlocks[i].Header
+				nonVerificationBlocks[i].Header = "Prerequisites"
+				if originalHeader != "" && !strings.EqualFold(originalHeader, "Prerequisites") {
+					if strings.TrimSpace(nonVerificationBlocks[i].Description) != "" {
+						nonVerificationBlocks[i].Description = fmt.Sprintf("%s\n\n%s", originalHeader, nonVerificationBlocks[i].Description)
+					} else {
+						nonVerificationBlocks[i].Description = originalHeader
+					}
+				}
+			}
+			rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, nonVerificationBlocks...)
+
+			// 5. (Removed completion banner per request to suppress execution completed line.)
+
+			// Recombine all codeblocks in the new order.
+			codeBlocks = append([]parsers.CodeBlock{}, beforePrerequisites...)
+			codeBlocks = append(codeBlocks, rebuiltPrereqBlocks...)
 			codeBlocks = append(codeBlocks, afterPrerequisites...)
 		}
 	} else {
@@ -287,6 +410,7 @@ func CreateScenarioFromMarkdown(
 
 	return &Scenario{
 		Name:        title,
+		IntroText:   strings.TrimSpace(introText),
 		Environment: environmentVariables,
 		Steps:       steps,
 		Properties:  properties,
