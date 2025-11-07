@@ -164,30 +164,12 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 			}
 			if strings.TrimSpace(block.Description) != "" && !(isBodyBlock && markerPresent) {
 				descLines := strings.Split(block.Description, "\n")
-				// If we're no longer in the Prerequisites step, filter out any residual prerequisite list narrative.
-				if !strings.EqualFold(step.Name, "Prerequisites") {
-					filtered := []string{}
-					for _, l := range descLines {
-						trimmed := strings.TrimSpace(l)
-						if trimmed == "" { filtered = append(filtered, l); continue }
-						// Suppress lines that clearly belong to the prerequisites section narrative or list.
-						if strings.Contains(trimmed, "prerequisite documents will be executed before validation") ||
-							strings.HasPrefix(trimmed, "- [A prerequisite") ||
-							strings.HasPrefix(trimmed, "- [A prereuisite") ||
-							strings.HasPrefix(trimmed, "- [A prerequisite that is missing") {
-							continue
-						}
-						filtered = append(filtered, l)
-					}
-					descLines = filtered
-				}
-				printedAny := false
 				for _, line := range descLines {
-					if strings.TrimSpace(line) == "" && !printedAny { continue } // avoid leading blank lines
+					// Indent to align with command blocks for visual grouping.
 					fmt.Printf("    %s\n", ui.VerboseStyle.Render(line))
-					printedAny = true
 				}
-				if printedAny { fmt.Println() }
+				// Blank line separating description from the command that follows.
+				fmt.Println()
 			}
 
 			var finalCommandOutput string
@@ -297,10 +279,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 									fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
 									terminal.MoveCursorPositionDown(lines)
 									fmt.Printf("  %s\n", ui.ErrorMessageStyle.Render(outputComparisonError.Error()))
-									diff := lib.GetDifferenceBetweenStrings(block.ExpectedOutput.Content, commandOutput.StdOut)
-									if strings.TrimSpace(diff) != "" {
-										fmt.Printf("    %s\n", diff)
-									}
+									renderExpectedActual(block.ExpectedOutput.Content, commandOutput.StdOut)
 									// Suppress noisy warning log for expected verification failure; body will execute.
 									// Failure means body should execute; marker stays absent.
 									break renderingLoop
@@ -310,7 +289,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 								fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
 								terminal.MoveCursorPositionDown(lines)
 								fmt.Printf("  %s\n", ui.ErrorMessageStyle.Render(outputComparisonError.Error()))
-								fmt.Printf("    %s\n", lib.GetDifferenceBetweenStrings(block.ExpectedOutput.Content, commandOutput.StdOut))
+								renderExpectedActual(block.ExpectedOutput.Content, commandOutput.StdOut)
 
 								azureStatus.SetError(outputComparisonError)
 								environments.AttachResourceURIsToAzureStatus(
@@ -511,6 +490,35 @@ func stripAutoPrereqComment(content string) string {
 	}
 
 	return parts[1]
+}
+
+func renderExpectedActual(expected, actual string) {
+	trimmedExpected := strings.TrimRight(expected, "\n")
+	trimmedActual := strings.TrimRight(actual, "\n")
+
+	if strings.TrimSpace(trimmedExpected) != "" {
+		fmt.Println("    Expected:")
+		renderIndentedBlock(trimmedExpected)
+	}
+
+	fmt.Println("    Actual:")
+	renderIndentedBlock(trimmedActual)
+}
+
+func renderIndentedBlock(content string) {
+	if strings.TrimSpace(content) == "" {
+		fmt.Println("        <empty>")
+		return
+	}
+
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			fmt.Println("        ")
+			continue
+		}
+		fmt.Printf("        %s\n", ui.VerboseStyle.Render(line))
+	}
 }
 
 func writePrereqMarker(markerPath, display string) error {
