@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -278,8 +279,12 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 								if isVerificationBlock {
 									fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
 									terminal.MoveCursorPositionDown(lines)
-									fmt.Printf("  %s\n", ui.ErrorMessageStyle.Render(outputComparisonError.Error()))
-									renderExpectedActual(block.ExpectedOutput.Content, commandOutput.StdOut)
+									renderExpectedActual(
+										block.ExpectedOutput.Content,
+										commandOutput.StdOut,
+										expectedSimilarity,
+										expectedRegex,
+									)
 									// Suppress noisy warning log for expected verification failure; body will execute.
 									// Failure means body should execute; marker stays absent.
 									break renderingLoop
@@ -288,8 +293,12 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 								logging.GlobalLogger.Errorf("Error comparing command outputs: %s", outputComparisonError.Error())
 								fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
 								terminal.MoveCursorPositionDown(lines)
-								fmt.Printf("  %s\n", ui.ErrorMessageStyle.Render(outputComparisonError.Error()))
-								renderExpectedActual(block.ExpectedOutput.Content, commandOutput.StdOut)
+								renderExpectedActual(
+									block.ExpectedOutput.Content,
+									commandOutput.StdOut,
+									expectedSimilarity,
+									expectedRegex,
+								)
 
 								azureStatus.SetError(outputComparisonError)
 								environments.AttachResourceURIsToAzureStatus(
@@ -492,33 +501,61 @@ func stripAutoPrereqComment(content string) string {
 	return parts[1]
 }
 
-func renderExpectedActual(expected, actual string) {
-	trimmedExpected := strings.TrimRight(expected, "\n")
+func renderExpectedActual(expected string, actual string, expectedSimilarity float64, expectedRegex *regexp.Regexp) {
 	trimmedActual := strings.TrimRight(actual, "\n")
+	trimmedExpected := strings.TrimRight(expected, "\n")
+	fmt.Println("  " + ui.ErrorMessageStyle.Render("Expected output does not match:"))
 
-	if strings.TrimSpace(trimmedExpected) != "" {
-		fmt.Println("    Expected:")
-		renderIndentedBlock(trimmedExpected)
+	showSimilarity := expectedRegex == nil
+	regexPattern := ""
+	if expectedRegex != nil {
+		regexPattern = expectedRegex.String()
+		if parsed, err := strconv.ParseFloat(regexPattern, 64); err == nil {
+			showSimilarity = true
+			if expectedSimilarity == 0 {
+				expectedSimilarity = parsed
+			}
+		}
+	}
+
+	if showSimilarity {
+		threshold := formatSimilarityValue(expectedSimilarity)
+		fmt.Printf("    Expected similarity level of %s against:\n", threshold)
+		renderIndentedBlock(trimmedExpected, "      ")
+	} else {
+		fmt.Println("    Expected RE match:")
+		renderIndentedBlock(regexPattern, "      ")
 	}
 
 	fmt.Println("    Actual:")
-	renderIndentedBlock(trimmedActual)
+	renderIndentedBlock(trimmedActual, "      ")
 }
 
-func renderIndentedBlock(content string) {
+func renderIndentedBlock(content string, indent string) {
 	if strings.TrimSpace(content) == "" {
-		fmt.Println("        <empty>")
+		fmt.Printf("%s<empty>\n", indent)
 		return
 	}
 
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
-			fmt.Println("        ")
+			fmt.Println(indent)
 			continue
 		}
-		fmt.Printf("        %s\n", ui.VerboseStyle.Render(line))
+		fmt.Printf("%s%s\n", indent, ui.VerboseStyle.Render(line))
 	}
+}
+
+func formatSimilarityValue(value float64) string {
+	if value == 0 {
+		return "0"
+	}
+	formatted := strconv.FormatFloat(value, 'g', -1, 64)
+	if !strings.Contains(formatted, ".") {
+		return fmt.Sprintf("%.1f", value)
+	}
+	return formatted
 }
 
 func writePrereqMarker(markerPath, display string) error {

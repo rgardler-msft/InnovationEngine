@@ -24,7 +24,7 @@ echo "Prerequisite needs to run PREREQ_RAN is not set."
 
 If the similarity test fails then the main content of this document will be executed.
 
-<!-- expected_similarity="Prerequisite already executed" -->
+<!-- expected_similarity=".*already executed" -->
 ```text
 Prerequisite already executed
 ```
