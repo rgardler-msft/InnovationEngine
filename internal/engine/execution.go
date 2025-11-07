@@ -277,7 +277,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 
 							if outputComparisonError != nil {
 								if isVerificationBlock {
-									fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
+									fmt.Print("\r    \n")
 									terminal.MoveCursorPositionDown(lines)
 									renderExpectedActual(
 										block.ExpectedOutput.Content,
@@ -291,7 +291,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 								}
 
 								logging.GlobalLogger.Errorf("Error comparing command outputs: %s", outputComparisonError.Error())
-								fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
+								fmt.Print("\r    \n")
 								terminal.MoveCursorPositionDown(lines)
 								renderExpectedActual(
 									block.ExpectedOutput.Content,
