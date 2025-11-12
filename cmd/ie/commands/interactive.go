@@ -105,6 +105,7 @@ var interactiveCommand = &cobra.Command{
 		innovationEngine, err := engine.NewEngine(engine.EngineConfiguration{
 			Verbose:          verbose,
 			DoNotDelete:      doNotDelete,
+			StreamOutput:     true, // Interactive mode always streams
 			Subscription:     subscription,
 			CorrelationId:    correlationId,
 			Environment:      environment,

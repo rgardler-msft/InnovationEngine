@@ -17,6 +17,8 @@ func init() {
 	testCommand.PersistentFlags().
 		Bool("verbose", false, "Enable verbose logging & standard output.")
 	testCommand.PersistentFlags().
+		Bool("stream-output", true, "Stream command output in real-time as it's generated (default). Use --stream-output=false to show spinner and display output after completion.")
+	testCommand.PersistentFlags().
 		String("subscription", "", "Sets the subscription ID used by a scenarios azure-cli commands. Will rely on the default subscription if not set.")
 	testCommand.PersistentFlags().
 		String("working-directory", ".", "Sets the working directory for innovation engine to operate out of. Restores the current working directory when finished.")
@@ -39,6 +41,7 @@ var testCommand = &cobra.Command{
 		}
 
 		verbose, _ := cmd.Flags().GetBool("verbose")
+		streamOutput, _ := cmd.Flags().GetBool("stream-output")
 		subscription, _ := cmd.Flags().GetString("subscription")
 		workingDirectory, _ := cmd.Flags().GetString("working-directory")
 		environment, _ := cmd.Flags().GetString("environment")
@@ -66,6 +69,7 @@ var testCommand = &cobra.Command{
 		innovationEngine, err := engine.NewEngine(engine.EngineConfiguration{
 			Verbose:          verbose,
 			DoNotDelete:      false,
+			StreamOutput:     streamOutput,
 			Subscription:     subscription,
 			CorrelationId:    "",
 			WorkingDirectory: workingDirectory,

@@ -3,6 +3,7 @@ package shells
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -45,6 +46,7 @@ type BashCommandConfiguration struct {
 	InheritEnvironment   bool
 	InteractiveCommand   bool
 	WriteToHistory       bool
+	StreamOutput         bool // New: stream output to stdout in real-time
 }
 
 var ExecuteBashCommand = executeBashCommandImpl
@@ -79,6 +81,10 @@ func executeBashCommandImpl(
 		commandToExecute.Stdout = os.Stdout
 		commandToExecute.Stderr = os.Stderr
 		commandToExecute.Stdin = os.Stdin
+	} else if config.StreamOutput {
+		// Stream output in real-time while also capturing to buffer
+		commandToExecute.Stdout = io.MultiWriter(&stdoutBuffer, os.Stdout)
+		commandToExecute.Stderr = io.MultiWriter(&stderrBuffer, os.Stderr)
 	} else {
 		commandToExecute.Stdout = &stdoutBuffer
 		commandToExecute.Stderr = &stderrBuffer

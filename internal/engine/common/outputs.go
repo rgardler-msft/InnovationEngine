@@ -88,7 +88,7 @@ func normalizeOutput(value string) string {
 	// Strip ANSI color codes first
 	ansiPattern := regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	value = ansiPattern.ReplaceAllString(value, "")
-	
+
 	// Then normalize line endings
 	value = strings.ReplaceAll(value, "\r\n", "\n")
 	return strings.ReplaceAll(value, "\r", "\n")

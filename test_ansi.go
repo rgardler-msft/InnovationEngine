@@ -7,7 +7,7 @@ import (
 
 func main() {
 	// Simulate kubectl output WITH ANSI color codes - different scenarios
-	scenarios := []struct{
+	scenarios := []struct {
 		name string
 		text string
 	}{
@@ -32,20 +32,20 @@ func main() {
 			"Kubernetes control plane is running at https://...",
 		},
 	}
-	
+
 	// The regex pattern
 	pattern := `(?s).*control plane is running.*`
 	re := regexp.MustCompile(pattern)
-	
+
 	ansiPattern := regexp.MustCompile(`\x1b\[[0-9;]*m`)
-	
+
 	for _, scenario := range scenarios {
 		fmt.Printf("\n%s:\n", scenario.name)
 		fmt.Printf("  Text: %q\n", scenario.text)
-		
+
 		matches := re.MatchString(scenario.text)
 		fmt.Printf("  Matches: %v\n", matches)
-		
+
 		if !matches {
 			stripped := ansiPattern.ReplaceAllString(scenario.text, "")
 			fmt.Printf("  Stripped: %q\n", stripped)

@@ -22,6 +22,8 @@ func init() {
 		Bool("verbose", false, "Show extra console context (working dirs, full command output). For deeper persisted diagnostics use --log-level")
 	executeCommand.PersistentFlags().
 		Bool("do-not-delete", false, "Do not delete the Azure resources created by the Azure CLI commands executed.")
+	executeCommand.PersistentFlags().
+		Bool("stream-output", true, "Stream command output in real-time as it's generated (default). Use --stream-output=false to show spinner and display output after completion.")
 
 	// String flags
 	executeCommand.PersistentFlags().
@@ -67,6 +69,7 @@ var executeCommand = &cobra.Command{
 
 		verbose, _ := cmd.Flags().GetBool("verbose")
 		doNotDelete, _ := cmd.Flags().GetBool("do-not-delete")
+		streamOutput, _ := cmd.Flags().GetBool("stream-output")
 
 		subscription, _ := cmd.Flags().GetString("subscription")
 		correlationId, _ := cmd.Flags().GetString("correlation-id")
@@ -126,6 +129,7 @@ var executeCommand = &cobra.Command{
 		innovationEngine, err := engine.NewEngine(engine.EngineConfiguration{
 			Verbose:          verbose,
 			DoNotDelete:      doNotDelete,
+			StreamOutput:     streamOutput,
 			Subscription:     subscription,
 			CorrelationId:    correlationId,
 			Environment:      environment,

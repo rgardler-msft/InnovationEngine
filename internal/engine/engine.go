@@ -22,6 +22,7 @@ import (
 type EngineConfiguration struct {
 	Verbose          bool
 	DoNotDelete      bool
+	StreamOutput     bool
 	CorrelationId    string
 	Subscription     string
 	Environment      string

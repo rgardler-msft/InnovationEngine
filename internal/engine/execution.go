@@ -247,11 +247,20 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 				// beginning of the block.
 
 				lines := strings.Count(finalCommandOutput, "\n")
-				terminal.MoveCursorPositionUp(lines)
-
-				// Render the spinner and hide the cursor.
-				fmt.Print(ui.SpinnerStyle.Render("  "+string(spinnerFrames[0])) + " ")
-				terminal.HideCursor()
+				
+				// When streaming output, we skip spinner rendering since output
+				// will appear in real-time
+				streamOutput := e.Configuration.StreamOutput
+				
+				if !streamOutput {
+					terminal.MoveCursorPositionUp(lines)
+					// Render the spinner and hide the cursor.
+					fmt.Print(ui.SpinnerStyle.Render("  "+string(spinnerFrames[0])) + " ")
+					terminal.HideCursor()
+				} else {
+					// For streaming, just print a newline to separate from command display
+					fmt.Println()
+				}
 
 				go func(block parsers.CodeBlock) {
 					output, err := shells.ExecuteBashCommand(
@@ -261,6 +270,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 							InheritEnvironment:   true,
 							InteractiveCommand:   false,
 							WriteToHistory:       true,
+							StreamOutput:         streamOutput,
 						},
 					)
 					logging.GlobalLogger.Infof("Command output to stdout:\n %s", output.StdOut)
@@ -275,7 +285,9 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 					case commandErr = <-done:
 						// Show the cursor, check the result of the command, and display the
 						// final status.
-						terminal.ShowCursor()
+						if !streamOutput {
+							terminal.ShowCursor()
+						}
 
 						if commandErr == nil {
 
@@ -292,8 +304,10 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 									if markerValue != "" {
 										failedVerificationMarkers[markerValue] = true
 									}
-									fmt.Print("\r    \n")
-									terminal.MoveCursorPositionDown(lines)
+									if !streamOutput {
+										fmt.Print("\r    \n")
+										terminal.MoveCursorPositionDown(lines)
+									}
 									renderExpectedActual(
 										block.ExpectedOutput.Content,
 										commandOutput.StdOut,
@@ -307,8 +321,10 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 								}
 
 								logging.GlobalLogger.Errorf("Error comparing command outputs: %s", outputComparisonError.Error())
-								fmt.Print("\r    \n")
-								terminal.MoveCursorPositionDown(lines)
+								if !streamOutput {
+									fmt.Print("\r    \n")
+									terminal.MoveCursorPositionDown(lines)
+								}
 								renderExpectedActual(
 									block.ExpectedOutput.Content,
 									commandOutput.StdOut,
@@ -329,10 +345,12 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 							}
 
 							// Suppress final success tick per UI refinement request.
-							fmt.Printf("\r    \n")
-							terminal.MoveCursorPositionDown(lines)
+							if !streamOutput {
+								fmt.Printf("\r    \n")
+								terminal.MoveCursorPositionDown(lines)
+							}
 
-							if strings.TrimSpace(commandOutput.StdOut) != "" {
+							if strings.TrimSpace(commandOutput.StdOut) != "" && !streamOutput {
 								fmt.Printf("%s\n", ui.RemoveHorizontalAlign(ui.VerboseStyle.Render(commandOutput.StdOut)))
 							}
 
@@ -360,8 +378,10 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 							}
 
 						} else {
-							fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
-							terminal.MoveCursorPositionDown(lines)
+							if !streamOutput {
+								fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
+								terminal.MoveCursorPositionDown(lines)
+							}
 							fmt.Printf("  %s\n", ui.ErrorMessageStyle.Render(commandErr.Error()))
 
 							logging.GlobalLogger.Errorf("Error executing command: %s", commandErr.Error())
@@ -387,9 +407,14 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 
 						break renderingLoop
 					default:
-						frame = (frame + 1) % len(spinnerFrames)
-						fmt.Printf("\r  %s", ui.SpinnerStyle.Render(string(spinnerFrames[frame])))
-						time.Sleep(spinnerRefresh)
+						if !streamOutput {
+							frame = (frame + 1) % len(spinnerFrames)
+							fmt.Printf("\r  %s", ui.SpinnerStyle.Render(string(spinnerFrames[frame])))
+							time.Sleep(spinnerRefresh)
+						} else {
+							// In streaming mode, just wait a bit before checking again
+							time.Sleep(spinnerRefresh)
+						}
 					}
 				}
 			} else {
