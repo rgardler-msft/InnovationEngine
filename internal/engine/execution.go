@@ -145,8 +145,15 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 			}
 
 			displayContent := commandContent
+			renderContent := commandContent
+			if isBodyBlock {
+				trimmed := stripPrereqBodyWrapper(commandContent)
+				displayContent = trimmed
+				renderContent = trimmed
+			}
 			if isBannerBlock {
 				displayContent = ""
+				renderContent = ""
 			}
 
 			blockToExecute := block
@@ -181,7 +188,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 			var finalCommandOutput string
 			if e.Configuration.RenderValues {
 				// Render the codeblock.
-				renderedCommand, err := renderCommand(commandContent)
+				renderedCommand, err := renderCommand(renderContent)
 				if err != nil {
 					logging.GlobalLogger.Errorf("Failed to render command: %s", err.Error())
 					azureStatus.SetError(err)
@@ -292,6 +299,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 										commandOutput.StdOut,
 										expectedSimilarity,
 										expectedRegex,
+										true,
 									)
 									// Suppress noisy warning log for expected verification failure; body will execute.
 									// Failure means body should execute; marker stays absent.
@@ -306,6 +314,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 									commandOutput.StdOut,
 									expectedSimilarity,
 									expectedRegex,
+									false,
 								)
 
 								azureStatus.SetError(outputComparisonError)
@@ -512,10 +521,32 @@ func stripAutoPrereqComment(content string) string {
 	return parts[1]
 }
 
-func renderExpectedActual(expected string, actual string, expectedSimilarity float64, expectedRegex *regexp.Regexp) {
+func stripPrereqBodyWrapper(content string) string {
+	trimmedContent := strings.TrimSuffix(content, "\n")
+	lines := strings.Split(trimmedContent, "\n")
+	if len(lines) < 3 {
+		return content
+	}
+
+	first := strings.TrimSpace(lines[0])
+	last := strings.TrimSpace(lines[len(lines)-1])
+	if !strings.HasPrefix(first, "if [ ! -f ") || !strings.HasSuffix(first, "]; then") || last != "fi" {
+		return content
+	}
+
+	inner := strings.Join(lines[1:len(lines)-1], "\n")
+	return inner
+}
+
+func renderExpectedActual(expected string, actual string, expectedSimilarity float64, expectedRegex *regexp.Regexp, isVerification bool) {
 	trimmedActual := strings.TrimRight(actual, "\n")
 	trimmedExpected := strings.TrimRight(expected, "\n")
-	fmt.Println("  " + ui.ErrorMessageStyle.Render("Expected output does not match:"))
+
+	if isVerification {
+		fmt.Println("  " + ui.WarningStyle.Render("Prerequisite verification failed, prereq needs to be run:"))
+	} else {
+		fmt.Println("  " + ui.ErrorMessageStyle.Render("Expected output does not match:"))
+	}
 
 	showSimilarity := expectedRegex == nil
 	regexPattern := ""
@@ -531,7 +562,7 @@ func renderExpectedActual(expected string, actual string, expectedSimilarity flo
 
 	if showSimilarity {
 		threshold := formatSimilarityValue(expectedSimilarity)
-		fmt.Printf("    Expected similarity level of %s against:\n", threshold)
+		fmt.Printf("    Expected similarity level of %s to:\n", threshold)
 		renderIndentedBlock(trimmedExpected, "      ")
 	} else {
 		fmt.Println("    Expected RE match:")

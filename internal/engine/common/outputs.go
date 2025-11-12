@@ -19,8 +19,11 @@ func CompareCommandOutputs(
 	expectedRegex *regexp.Regexp,
 	expectedOutputLanguage string,
 ) (float64, error) {
+	actualNormalized := normalizeLineEndings(actualOutput)
+	expectedNormalized := normalizeLineEndings(expectedOutput)
+
 	if expectedRegex != nil {
-		if !expectedRegex.MatchString(actualOutput) {
+		if !expectedRegex.MatchString(actualNormalized) {
 			return 0.0, fmt.Errorf(
 				ui.ErrorMessageStyle.Render(
 					fmt.Sprintf("Expected output does not match: %q.", expectedRegex),
@@ -34,10 +37,10 @@ func CompareCommandOutputs(
 	if strings.ToLower(expectedOutputLanguage) == "json" {
 		logging.GlobalLogger.Debugf(
 			"Comparing JSON strings:\nExpected: %s\nActual%s",
-			expectedOutput,
-			actualOutput,
+			expectedNormalized,
+			actualNormalized,
 		)
-		results, err := lib.CompareJsonStrings(actualOutput, expectedOutput, expectedSimilarity)
+		results, err := lib.CompareJsonStrings(actualNormalized, expectedNormalized, expectedSimilarity)
 		if err != nil {
 			return results.Score, err
 		}
@@ -53,8 +56,8 @@ func CompareCommandOutputs(
 				ui.ErrorMessageStyle.Render(
 					"Expected output does not match actual output.\nGot:\n%s\nExpected:\n%s\nExpected Score:%s\nActual Score:%s",
 				),
-				ui.VerboseStyle.Render(actualOutput),
-				ui.VerboseStyle.Render(expectedOutput),
+				ui.VerboseStyle.Render(actualNormalized),
+				ui.VerboseStyle.Render(expectedNormalized),
 				ui.VerboseStyle.Render(fmt.Sprintf("%f", expectedSimilarity)),
 				ui.VerboseStyle.Render(fmt.Sprintf("%f", results.Score)),
 			)
@@ -64,19 +67,24 @@ func CompareCommandOutputs(
 	}
 
 	// Default case, using similarity on non JSON block.
-	score := smetrics.JaroWinkler(expectedOutput, actualOutput, 0.7, 4)
+	score := smetrics.JaroWinkler(expectedNormalized, actualNormalized, 0.7, 4)
 
 	if expectedSimilarity > score {
 		return score, fmt.Errorf(
 			ui.ErrorMessageStyle.Render(
 				"Expected output does not match actual output.\nGot:\n%s\nExpected:\n%s\nExpected Score:%s\nActual Score:%s",
 			),
-			ui.VerboseStyle.Render(actualOutput),
-			ui.VerboseStyle.Render(expectedOutput),
+			ui.VerboseStyle.Render(actualNormalized),
+			ui.VerboseStyle.Render(expectedNormalized),
 			ui.VerboseStyle.Render(fmt.Sprintf("%f", expectedSimilarity)),
 			ui.VerboseStyle.Render(fmt.Sprintf("%f", score)),
 		)
 	}
 
 	return score, nil
+}
+
+func normalizeLineEndings(value string) string {
+	value = strings.ReplaceAll(value, "\r\n", "\n")
+	return strings.ReplaceAll(value, "\r", "\n")
 }

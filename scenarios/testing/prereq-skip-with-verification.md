@@ -19,6 +19,8 @@ This will always pass and thus this prerequisite should never run.
 echo "Validated prerequisite already satisfied"
 ```
 
+This will, of course always output:
+
 <!-- expected_similarity = 1.0 -->
 ```text
 Validated prerequisite already satisfied

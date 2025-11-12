@@ -24,6 +24,7 @@ var (
 	CheckStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("#32CD32"))
 	ErrorStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000"))
 	ErrorMessageStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5733"))
+	WarningStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500"))
 	OcdStatusUpdateStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#000000"))
 )
 
