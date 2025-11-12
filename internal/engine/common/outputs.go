@@ -19,8 +19,8 @@ func CompareCommandOutputs(
 	expectedRegex *regexp.Regexp,
 	expectedOutputLanguage string,
 ) (float64, error) {
-	actualNormalized := normalizeLineEndings(actualOutput)
-	expectedNormalized := normalizeLineEndings(expectedOutput)
+	actualNormalized := normalizeOutput(actualOutput)
+	expectedNormalized := normalizeOutput(expectedOutput)
 
 	if expectedRegex != nil {
 		if !expectedRegex.MatchString(actualNormalized) {
@@ -84,7 +84,12 @@ func CompareCommandOutputs(
 	return score, nil
 }
 
-func normalizeLineEndings(value string) string {
+func normalizeOutput(value string) string {
+	// Strip ANSI color codes first
+	ansiPattern := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	value = ansiPattern.ReplaceAllString(value, "")
+	
+	// Then normalize line endings
 	value = strings.ReplaceAll(value, "\r\n", "\n")
 	return strings.ReplaceAll(value, "\r", "\n")
 }
