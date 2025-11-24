@@ -17,6 +17,198 @@ import (
 	"github.com/yuin/goldmark/ast"
 )
 
+// injectPrerequisitesRecursively walks the prerequisites graph starting from the
+// provided markdown AST and source, inlining prerequisite execution blocks into
+// the supplied codeBlocks slice. It merges YAML metadata and scenario
+// variables from each prerequisite document and uses seenPrereqs to avoid
+// infinite recursion on cyclic graphs.
+func injectPrerequisitesRecursively(
+	codeBlocks []parsers.CodeBlock,
+	markdown ast.Node,
+	source []byte,
+	path string,
+	languagesToExecute []string,
+	introText string,
+	prerequisiteSectionText string,
+	properties map[string]interface{},
+	environmentVariables map[string]string,
+	seenPrereqs map[string]bool,
+	prerequisiteSectionUsed *bool,
+) []parsers.CodeBlock {
+	prerequisiteUrls, err := parsers.ExtractPrerequisiteUrlsFromAst(markdown, source)
+	if err != nil {
+		logging.GlobalLogger.Warn(err)
+		return codeBlocks
+	}
+	if len(prerequisiteUrls) == 0 {
+		return codeBlocks
+	}
+
+	for _, rawURL := range prerequisiteUrls {
+		url := rawURL
+		logging.GlobalLogger.Infof("Preparing to execute prerequisite: %s", url)
+		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+			url = filepath.Join(filepath.Dir(path), url)
+		}
+
+		// Guard against cycles and duplicate work using the fully resolved path/URL.
+		if seenPrereqs[url] {
+			logging.GlobalLogger.Infof("Skipping already-processed prerequisite: %s", url)
+			continue
+		}
+		seenPrereqs[url] = true
+
+		// Explicit pre-check for local file existence to avoid bubbling up an error.
+		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") && !fs.FileExists(url) {
+			msg := fmt.Sprintf("Prerequisite '%s' not found (continuing without it)", url)
+			logging.GlobalLogger.Warn(msg)
+			continue
+		}
+
+		prerequisiteSource, err := resolveMarkdownSource(url)
+		if err != nil {
+			// When a prerequisite document is not found or cannot be loaded output a warning and continue.
+			msg := fmt.Sprintf("Prerequisite '%s' could not be loaded: %v (continuing without it)", url, err)
+			logging.GlobalLogger.Warn(msg)
+			continue
+		}
+
+		prerequisiteMarkdown := parsers.ParseMarkdownIntoAst(prerequisiteSource)
+		// Attempt to extract a title for the prerequisite document; fallback to filename/URL.
+		prereqTitle, titleErr := parsers.ExtractScenarioTitleFromAst(prerequisiteMarkdown, prerequisiteSource)
+		if titleErr != nil || prereqTitle == "" {
+			prereqTitle = filepath.Base(url)
+		}
+		prereqDisplay := fmt.Sprintf("%s [%s]", prereqTitle, filepath.Base(url))
+		logging.GlobalLogger.Infof("Executing Prerequisite: %s", prereqDisplay)
+
+		// Merge prerequisite-level YAML metadata and variables.
+		prerequisiteProperties := parsers.ExtractYamlMetadataFromAst(prerequisiteMarkdown)
+		for key, value := range prerequisiteProperties {
+			properties[key] = value
+		}
+
+		prerequisiteVariables := parsers.ExtractScenarioVariablesFromAst(prerequisiteMarkdown, prerequisiteSource)
+		for key, value := range prerequisiteVariables {
+			environmentVariables[key] = value
+		}
+
+		// Recursively process any prerequisites that this prerequisite may have,
+		// ensuring nested prerequisite graphs are fully materialized.
+		codeBlocks = injectPrerequisitesRecursively(
+			codeBlocks,
+			prerequisiteMarkdown,
+			prerequisiteSource,
+			url,
+			languagesToExecute,
+			introText,
+			prerequisiteSectionText,
+			properties,
+			environmentVariables,
+			seenPrereqs,
+			prerequisiteSectionUsed,
+		)
+
+		prerequisiteCodeBlocks := parsers.ExtractCodeBlocksFromAst(prerequisiteMarkdown, prerequisiteSource, languagesToExecute, url)
+
+		// Partition prerequisite code blocks into verification and non-verification blocks.
+		var verificationBlocks, nonVerificationBlocks []parsers.CodeBlock
+		for _, b := range prerequisiteCodeBlocks {
+			if strings.EqualFold(b.Header, "Verification") {
+				verificationBlocks = append(verificationBlocks, b)
+			} else {
+				nonVerificationBlocks = append(nonVerificationBlocks, b)
+			}
+		}
+
+		// Generate a slug for this prerequisite title to create unique marker file paths.
+		slug := strings.ToLower(prereqTitle)
+		// Replace any non-alphanumeric characters with underscores to create a safe slug.
+		slug = regexp.MustCompile("[^a-z0-9]+").ReplaceAllString(slug, "_")
+		markerFile := fmt.Sprintf("/tmp/prereq_%s_skip", slug)
+
+		var beforePrerequisites, afterPrerequisites []parsers.CodeBlock
+		for _, block := range codeBlocks {
+			if block.Header == "Prerequisites" {
+				beforePrerequisites = append(beforePrerequisites, block)
+			} else {
+				afterPrerequisites = append(afterPrerequisites, block)
+			}
+		}
+
+		// Remove intro/prerequisite narrative from subsequent code blocks since we'll surface it on the banner.
+		afterPrerequisites = stripTextFromFirstDescription(afterPrerequisites, introText)
+		afterPrerequisites = stripTextFromFirstDescription(afterPrerequisites, prerequisiteSectionText)
+
+		var rebuiltPrereqBlocks []parsers.CodeBlock
+
+		// 1. Validation banner first so users see we're validating before running verification code.
+		validationBanner := parsers.CodeBlock{
+			Language: "bash",
+			Header:   "Prerequisites",
+			Content:  fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\necho \"Validating Prerequisite: %s\"\n", markerFile, prereqDisplay, prereqDisplay),
+		}
+		descriptionParts := []string{}
+		if !*prerequisiteSectionUsed && strings.TrimSpace(prerequisiteSectionText) != "" {
+			descriptionParts = append(descriptionParts, strings.TrimSpace(prerequisiteSectionText))
+			*prerequisiteSectionUsed = true
+		}
+		if len(descriptionParts) > 0 {
+			validationBanner.Description = strings.Join(descriptionParts, "\n\n")
+		}
+		rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, validationBanner)
+
+		// 2. Verification blocks so their output appears after the validation banner.
+		// Preserve original subheading by injecting it into Description while forcing Header to 'Prerequisites'.
+		for i, vb := range verificationBlocks {
+			annotated := vb
+			metadata := fmt.Sprintf("# ie:auto-prereq-verification marker=\"%s\" display=\"%s\" index=\"%d\" total=\"%d\"\n", markerFile, prereqDisplay, i+1, len(verificationBlocks))
+			annotated.Content = metadata + vb.Content
+			originalHeader := annotated.Header
+			annotated.Header = "Prerequisites"
+			if originalHeader != "" && !strings.EqualFold(originalHeader, "Prerequisites") {
+				if strings.TrimSpace(annotated.Description) != "" {
+					annotated.Description = fmt.Sprintf("%s\n\n%s", originalHeader, annotated.Description)
+				} else {
+					annotated.Description = originalHeader
+				}
+			}
+			rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, annotated)
+		}
+
+		// 3. Static decision banner (skip or execute) based on marker file written by any successful verification.
+		decisionBanner := parsers.CodeBlock{
+			Language: "bash",
+			Header:   "Prerequisites",
+			Content:  fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\nif [ -f \"%s\" ]; then echo \"Skipping Prerequisite: %s (verification passed)\"; else echo \"Executing Prerequisite: %s\"; fi\n", markerFile, prereqDisplay, markerFile, prereqDisplay, prereqDisplay),
+		}
+		rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, decisionBanner)
+
+		// 4. Non-verification prerequisite body wrapped so it only runs when marker absent.
+		for i := range nonVerificationBlocks {
+			wrapped := fmt.Sprintf("# ie:auto-prereq-body marker=\"%s\" display=\"%s\"\nif [ ! -f \"%s\" ]; then\n%s\nfi\n", markerFile, prereqDisplay, markerFile, nonVerificationBlocks[i].Content)
+			nonVerificationBlocks[i].Content = wrapped
+			originalHeader := nonVerificationBlocks[i].Header
+			nonVerificationBlocks[i].Header = "Prerequisites"
+			if originalHeader != "" && !strings.EqualFold(originalHeader, "Prerequisites") {
+				if strings.TrimSpace(nonVerificationBlocks[i].Description) != "" {
+					nonVerificationBlocks[i].Description = fmt.Sprintf("%s\n\n%s", originalHeader, nonVerificationBlocks[i].Description)
+				} else {
+					nonVerificationBlocks[i].Description = originalHeader
+				}
+			}
+		}
+		rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, nonVerificationBlocks...)
+
+		// Recombine all codeblocks in the new order.
+		codeBlocks = append([]parsers.CodeBlock{}, beforePrerequisites...)
+		codeBlocks = append(codeBlocks, rebuiltPrereqBlocks...)
+		codeBlocks = append(codeBlocks, afterPrerequisites...)
+	}
+
+	return codeBlocks
+}
+
 // Individual steps within a scenario.
 type Step struct {
 	Name       string
@@ -193,148 +385,8 @@ func CreateScenarioFromMarkdown(
 	introText := extractIntroTextBeforeSection(source, "Prerequisites")
 
 	// Extract the URLs of any prerequisite documents linked from the markdown file.
-	// TODO: This is a bit of a hack. Should be refactored to remove duplication. Use recursion.
-	prerequisiteUrls, err := parsers.ExtractPrerequisiteUrlsFromAst(markdown, source)
-	if err == nil && len(prerequisiteUrls) > 0 {
-		for _, url := range prerequisiteUrls {
-			// Load the prerequisite markdown and wrap its execution with start/end messages.
-			logging.GlobalLogger.Infof("Preparing to execute prerequisite: %s", url)
-			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-				url = filepath.Join(filepath.Dir(path), url)
-			}
-			// Explicit pre-check for local file existence to avoid bubbling up an error.
-			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") && !fs.FileExists(url) {
-				msg := fmt.Sprintf("Prerequisite '%s' not found (continuing without it)", url)
-				logging.GlobalLogger.Warn(msg)
-				continue
-			}
-			prerequisiteSource, err := resolveMarkdownSource(url)
-			if err != nil {
-				// When a prerequisite document is not found or cannot be loaded output a warning and continue.
-				msg := fmt.Sprintf("Prerequisite '%s' could not be loaded: %v (continuing without it)", url, err)
-				logging.GlobalLogger.Warn(msg)
-				continue
-			}
-
-			prerequisiteMarkdown := parsers.ParseMarkdownIntoAst(prerequisiteSource)
-			// Attempt to extract a title for the prerequisite document; fallback to filename/URL.
-			prereqTitle, titleErr := parsers.ExtractScenarioTitleFromAst(prerequisiteMarkdown, prerequisiteSource)
-			if titleErr != nil || prereqTitle == "" {
-				prereqTitle = filepath.Base(url)
-			}
-			prereqDisplay := fmt.Sprintf("%s [%s]", prereqTitle, filepath.Base(url))
-			logging.GlobalLogger.Infof("Executing Prerequisite: %s", prereqDisplay)
-			prerequisiteProperties := parsers.ExtractYamlMetadataFromAst(prerequisiteMarkdown)
-			for key, value := range prerequisiteProperties {
-				properties[key] = value
-			}
-
-			prerequisiteVariables := parsers.ExtractScenarioVariablesFromAst(prerequisiteMarkdown, prerequisiteSource)
-			for key, value := range prerequisiteVariables {
-				environmentVariables[key] = value
-			}
-
-			prerequisiteCodeBlocks := parsers.ExtractCodeBlocksFromAst(prerequisiteMarkdown, prerequisiteSource, languagesToExecute, url)
-
-			// Partition prerequisite code blocks into verification and non-verification blocks.
-			var verificationBlocks, nonVerificationBlocks []parsers.CodeBlock
-			for _, b := range prerequisiteCodeBlocks {
-				if strings.EqualFold(b.Header, "Verification") {
-					verificationBlocks = append(verificationBlocks, b)
-				} else {
-					nonVerificationBlocks = append(nonVerificationBlocks, b)
-				}
-			}
-
-			// Generate a slug for this prerequisite title to create unique marker file paths.
-			slug := strings.ToLower(prereqTitle)
-			// Replace any non-alphanumeric characters with underscores to create a safe slug.
-			slug = regexp.MustCompile("[^a-z0-9]+").ReplaceAllString(slug, "_")
-			markerFile := fmt.Sprintf("/tmp/prereq_%s_skip", slug)
-
-			var beforePrerequisites, afterPrerequisites []parsers.CodeBlock
-			for _, block := range codeBlocks {
-				if block.Header == "Prerequisites" {
-					beforePrerequisites = append(beforePrerequisites, block)
-				} else {
-					afterPrerequisites = append(afterPrerequisites, block)
-				}
-			}
-
-			// Remove intro/prerequisite narrative from subsequent code blocks since we'll surface it on the banner.
-			afterPrerequisites = stripTextFromFirstDescription(afterPrerequisites, introText)
-			afterPrerequisites = stripTextFromFirstDescription(afterPrerequisites, prerequisiteSectionText)
-
-			var rebuiltPrereqBlocks []parsers.CodeBlock
-
-			// 1. Validation banner first so users see we're validating before running verification code.
-			validationBanner := parsers.CodeBlock{
-				Language: "bash",
-				Header:   "Prerequisites",
-				Content:  fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\necho \"Validating Prerequisite: %s\"\n", markerFile, prereqDisplay, prereqDisplay),
-			}
-			descriptionParts := []string{}
-			if !prerequisiteSectionUsed && strings.TrimSpace(prerequisiteSectionText) != "" {
-				descriptionParts = append(descriptionParts, strings.TrimSpace(prerequisiteSectionText))
-				prerequisiteSectionUsed = true
-			}
-			if len(descriptionParts) > 0 {
-				validationBanner.Description = strings.Join(descriptionParts, "\n\n")
-			}
-			rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, validationBanner)
-
-			// 2. Verification blocks so their output appears after the validation banner.
-			// Preserve original subheading by injecting it into Description while forcing Header to 'Prerequisites'.
-			for i, vb := range verificationBlocks {
-				annotated := vb
-				metadata := fmt.Sprintf("# ie:auto-prereq-verification marker=\"%s\" display=\"%s\" index=\"%d\" total=\"%d\"\n", markerFile, prereqDisplay, i+1, len(verificationBlocks))
-				annotated.Content = metadata + vb.Content
-				originalHeader := annotated.Header
-				annotated.Header = "Prerequisites"
-				if originalHeader != "" && !strings.EqualFold(originalHeader, "Prerequisites") {
-					if strings.TrimSpace(annotated.Description) != "" {
-						annotated.Description = fmt.Sprintf("%s\n\n%s", originalHeader, annotated.Description)
-					} else {
-						annotated.Description = originalHeader
-					}
-				}
-				rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, annotated)
-			}
-
-			// 3. Static decision banner (skip or execute) based on marker file written by any successful verification.
-			decisionBanner := parsers.CodeBlock{
-				Language: "bash",
-				Header:   "Prerequisites",
-				Content:  fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\nif [ -f \"%s\" ]; then echo \"Skipping Prerequisite: %s (verification passed)\"; else echo \"Executing Prerequisite: %s\"; fi\n", markerFile, prereqDisplay, markerFile, prereqDisplay, prereqDisplay),
-			}
-			rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, decisionBanner)
-
-			// 4. Non-verification prerequisite body wrapped so it only runs when marker absent.
-			for i := range nonVerificationBlocks {
-				wrapped := fmt.Sprintf("# ie:auto-prereq-body marker=\"%s\" display=\"%s\"\nif [ ! -f \"%s\" ]; then\n%s\nfi\n", markerFile, prereqDisplay, markerFile, nonVerificationBlocks[i].Content)
-				nonVerificationBlocks[i].Content = wrapped
-				originalHeader := nonVerificationBlocks[i].Header
-				nonVerificationBlocks[i].Header = "Prerequisites"
-				if originalHeader != "" && !strings.EqualFold(originalHeader, "Prerequisites") {
-					if strings.TrimSpace(nonVerificationBlocks[i].Description) != "" {
-						nonVerificationBlocks[i].Description = fmt.Sprintf("%s\n\n%s", originalHeader, nonVerificationBlocks[i].Description)
-					} else {
-						nonVerificationBlocks[i].Description = originalHeader
-					}
-				}
-			}
-			rebuiltPrereqBlocks = append(rebuiltPrereqBlocks, nonVerificationBlocks...)
-
-			// 5. (Removed completion banner per request to suppress execution completed line.)
-
-			// Recombine all codeblocks in the new order.
-			codeBlocks = append([]parsers.CodeBlock{}, beforePrerequisites...)
-			codeBlocks = append(codeBlocks, rebuiltPrereqBlocks...)
-			codeBlocks = append(codeBlocks, afterPrerequisites...)
-		}
-	} else {
-		logging.GlobalLogger.Warn(err)
-	}
+	// Use a recursive helper so that prerequisites of prerequisites are also processed.
+	codeBlocks = injectPrerequisitesRecursively(codeBlocks, markdown, source, path, languagesToExecute, introText, prerequisiteSectionText, properties, environmentVariables, make(map[string]bool), &prerequisiteSectionUsed)
 
 	varsToExport := lib.CopyMap(environmentVariableOverrides)
 	for key, value := range environmentVariableOverrides {

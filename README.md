@@ -90,6 +90,12 @@ Innovation Engine is self-documenting, that is all our documentation is written 
 make test-docs
 ```
 
+For a fast smoke test of the core engine behaviors (code blocks, variables, fuzzy matching, streaming output, and the recursive prerequisite workflow), you can run the master testing scenario:
+
+```bash
+./bin/ie execute scenarios/testing/test.md
+```
+
 If you make any changes to the IE code (see Contributing below) we would encourage you to tun the full test suite before issuing a PR.
 
 To manual test a document it is best to run in `interactive` mode (see below). This mode provides an interactive console for reading and executing the content of Executable Documentation.
