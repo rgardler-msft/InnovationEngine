@@ -2,10 +2,9 @@ package commands
 
 import (
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/Azure/InnovationEngine/internal/engine/common"
+	"github.com/Azure/InnovationEngine/internal/lib"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/Azure/InnovationEngine/internal/ui"
 	"github.com/spf13/cobra"
@@ -29,34 +28,26 @@ func init() {
 }
 
 var inspectCommand = &cobra.Command{
-	Use:   "inspect",
+	Use:   "inspect [markdown file]",
+	Args:  cobra.MinimumNArgs(1),
 	Short: "Execute a document in inspect mode.",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		markdownFile := args[0]
 		if markdownFile == "" {
 			logging.GlobalLogger.Errorf("Error: No markdown file specified.")
 			cmd.Help()
-			os.Exit(1)
+			return fmt.Errorf("no markdown file specified")
 		}
 
 		environmentVariables, _ := cmd.Flags().GetStringArray("var")
 		// features, _ := cmd.Flags().GetStringArray("feature")
 
-		// Parse the environment variables from the command line into a map
-		cliEnvironmentVariables := make(map[string]string)
-		for _, environmentVariable := range environmentVariables {
-			keyValuePair := strings.SplitN(environmentVariable, "=", 2)
-			if len(keyValuePair) != 2 {
-				logging.GlobalLogger.Errorf(
-					"Error: Invalid environment variable format: %s",
-					environmentVariable,
-				)
-				fmt.Printf("Error: Invalid environment variable format: %s", environmentVariable)
-				cmd.Help()
-				os.Exit(1)
-			}
-
-			cliEnvironmentVariables[keyValuePair[0]] = keyValuePair[1]
+		cliEnvironmentVariables, err := lib.ParseEnvironmentVariableAssignments(environmentVariables)
+		if err != nil {
+			logging.GlobalLogger.Errorf("Error: %s", err)
+			fmt.Printf("Error: %s\n", err)
+			cmd.Help()
+			return err
 		}
 		// Parse the markdown file and create a scenario
 		scenario, err := common.CreateScenarioFromMarkdown(
@@ -67,13 +58,7 @@ var inspectCommand = &cobra.Command{
 		if err != nil {
 			logging.GlobalLogger.Errorf("Error creating scenario: %s", err)
 			fmt.Printf("Error creating scenario: %s", err)
-			os.Exit(1)
-		}
-
-		if err != nil {
-			logging.GlobalLogger.Errorf("Error creating engine: %s", err)
-			fmt.Printf("Error creating engine: %s", err)
-			os.Exit(1)
+			return fmt.Errorf("error creating scenario: %w", err)
 		}
 
 		fmt.Println(ui.ScenarioTitleStyle.Render(scenario.Name))
@@ -104,5 +89,7 @@ var inspectCommand = &cobra.Command{
 				fmt.Println()
 			}
 		}
+
+		return nil
 	},
 }

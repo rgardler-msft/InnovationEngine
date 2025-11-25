@@ -14,11 +14,11 @@ import (
 var rootCommand = &cobra.Command{
 	Use:   "ie",
 	Short: "The innovation engine.",
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		logLevel, err := cmd.Flags().GetString("log-level")
 		if err != nil {
 			fmt.Printf("Error getting log level: %s", err)
-			os.Exit(1)
+			return fmt.Errorf("error getting log level: %w", err)
 		}
 		logging.Init(logging.LevelFromString(logLevel))
 
@@ -27,14 +27,16 @@ var rootCommand = &cobra.Command{
 		if err != nil {
 			fmt.Printf("Error getting environment: %s", err)
 			logging.GlobalLogger.Errorf("Error getting environment: %s", err)
-			os.Exit(1)
+			return fmt.Errorf("error getting environment: %w", err)
 		}
 
 		if !environments.IsValidEnvironment(environment) {
 			fmt.Printf("Invalid environment: %s", environment)
-			logging.GlobalLogger.Errorf("Invalid environment: %s", err)
-			os.Exit(1)
+			logging.GlobalLogger.Errorf("Invalid environment: %s", environment)
+			return fmt.Errorf("invalid environment: %s", environment)
 		}
+
+		return nil
 	},
 }
 

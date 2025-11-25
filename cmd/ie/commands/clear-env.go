@@ -36,7 +36,7 @@ Examples:
   ie clear-env --working-dir      # Clear env vars and working directory
   ie clear-env --all              # Clear both env vars and working directory
   ie clear-env --force            # Clear without confirmation`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		force, _ := cmd.Flags().GetBool("force")
 		clearAll, _ := cmd.Flags().GetBool("all")
 		clearWorkingDir, _ := cmd.Flags().GetBool("working-dir")
@@ -57,7 +57,7 @@ Examples:
 			fmt.Scanln(&response)
 			if response != "y" && response != "Y" && response != "yes" {
 				fmt.Println("Operation cancelled.")
-				return
+				return nil
 			}
 		}
 
@@ -68,7 +68,7 @@ Examples:
 				if !os.IsNotExist(err) {
 					logging.GlobalLogger.Errorf("Error clearing environment variables: %s", err)
 					fmt.Printf("Error clearing environment variables: %s\n", err)
-					os.Exit(1)
+					return fmt.Errorf("error clearing environment variables: %w", err)
 				} else {
 					fmt.Println("Environment variables state file was already clear.")
 				}
@@ -84,7 +84,7 @@ Examples:
 				if !os.IsNotExist(err) {
 					logging.GlobalLogger.Errorf("Error clearing working directory state: %s", err)
 					fmt.Printf("Error clearing working directory state: %s\n", err)
-					os.Exit(1)
+					return fmt.Errorf("error clearing working directory state: %w", err)
 				} else {
 					fmt.Println("Working directory state file was already clear.")
 				}
@@ -94,5 +94,6 @@ Examples:
 		}
 
 		logging.GlobalLogger.Info("Environment state cleared successfully")
+		return nil
 	},
 }
