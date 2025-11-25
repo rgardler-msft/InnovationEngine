@@ -8,7 +8,6 @@ import (
 
 	"github.com/Azure/InnovationEngine/internal/engine"
 	"github.com/Azure/InnovationEngine/internal/engine/common"
-	"github.com/Azure/InnovationEngine/internal/engine/environments"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
 )
@@ -51,8 +50,14 @@ var interactiveCommand = &cobra.Command{
 
 		subscription, _ := cmd.Flags().GetString("subscription")
 		correlationId, _ := cmd.Flags().GetString("correlation-id")
-		environment, _ := cmd.Flags().GetString("environment")
 		workingDirectory, _ := cmd.Flags().GetString("working-directory")
+
+		environmentSetting, err := getEnvironmentSetting(cmd)
+		if err != nil {
+			logging.GlobalLogger.Errorf("Error resolving environment: %s", err)
+			fmt.Printf("Error resolving environment: %s\n", err)
+			return err
+		}
 
 		environmentVariables, _ := cmd.Flags().GetStringArray("var")
 		// features, _ := cmd.Flags().GetStringArray("feature")
@@ -85,7 +90,7 @@ var interactiveCommand = &cobra.Command{
 			StreamOutput:     true, // Interactive mode always streams
 			Subscription:     subscription,
 			CorrelationId:    correlationId,
-			Environment:      environments.Environment(environment),
+			Environment:      environmentSetting,
 			WorkingDirectory: workingDirectory,
 			RenderValues:     renderValues,
 		})

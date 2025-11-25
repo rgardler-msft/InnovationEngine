@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/Azure/InnovationEngine/internal/engine/common"
-	"github.com/Azure/InnovationEngine/internal/engine/environments"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
 )
@@ -26,8 +25,14 @@ var toBashCommand = &cobra.Command{
 			return errors.New("error: No markdown file specified")
 		}
 
-		environment, _ := cmd.Flags().GetString("environment")
 		environmentVariables, _ := cmd.Flags().GetStringArray("var")
+
+		environmentSetting, err := getEnvironmentSetting(cmd)
+		if err != nil {
+			logging.GlobalLogger.Errorf("Error resolving environment: %s", err)
+			fmt.Printf("Error resolving environment: %s\n", err)
+			return err
+		}
 
 		// Parse the environment variables
 		cliEnvironmentVariables := make(map[string]string)
@@ -62,7 +67,7 @@ var toBashCommand = &cobra.Command{
 
 		// If within cloudshell, we need to wrap the script in a json object to
 		// communicate it to the portal.
-		if environments.IsAzureEnvironment(environment) {
+		if environmentSetting.IsAzureLike() {
 			script := AzureScript{Script: scenario.ToShellScript()}
 			scriptJson, err := json.Marshal(script)
 			if err != nil {

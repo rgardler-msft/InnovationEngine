@@ -1,6 +1,11 @@
 package commands
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+
+	"github.com/Azure/InnovationEngine/internal/engine/environments"
+	"github.com/spf13/cobra"
+)
 
 // addCommonExecutionFlags adds flags that are shared across execution-style
 // commands such as execute, interactive, and test.
@@ -25,4 +30,20 @@ func addCommonExecutionFlags(cmd *cobra.Command) {
 func addCorrelationFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().
 		String("correlation-id", "", "Adds a correlation ID to the user agent used by a scenarios azure-cli commands.")
+}
+
+// getEnvironmentSetting fetches and validates the --environment flag, returning
+// a typed Environment so callers do not need to duplicate parsing logic.
+func getEnvironmentSetting(cmd *cobra.Command) (environments.Environment, error) {
+	value, err := cmd.Flags().GetString("environment")
+	if err != nil {
+		return "", fmt.Errorf("error getting environment flag: %w", err)
+	}
+
+	parsed, err := environments.Parse(value)
+	if err != nil {
+		return "", err
+	}
+
+	return parsed, nil
 }

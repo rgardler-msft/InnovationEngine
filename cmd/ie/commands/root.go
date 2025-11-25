@@ -22,18 +22,10 @@ var rootCommand = &cobra.Command{
 		}
 		logging.Init(logging.LevelFromString(logLevel))
 
-		// Check environment
-		environment, err := cmd.Flags().GetString("environment")
-		if err != nil {
-			fmt.Printf("Error getting environment: %s", err)
-			logging.GlobalLogger.Errorf("Error getting environment: %s", err)
-			return fmt.Errorf("error getting environment: %w", err)
-		}
-
-		if !environments.IsValidEnvironment(environment) {
-			fmt.Printf("Invalid environment: %s", environment)
-			logging.GlobalLogger.Errorf("Invalid environment: %s", environment)
-			return fmt.Errorf("invalid environment: %s", environment)
+		if _, err := getEnvironmentSetting(cmd); err != nil {
+			fmt.Printf("Error resolving environment: %s", err)
+			logging.GlobalLogger.Errorf("Error resolving environment: %s", err)
+			return fmt.Errorf("error resolving environment: %w", err)
 		}
 
 		return nil

@@ -5,7 +5,6 @@ import (
 
 	"github.com/Azure/InnovationEngine/internal/engine"
 	"github.com/Azure/InnovationEngine/internal/engine/common"
-	"github.com/Azure/InnovationEngine/internal/engine/environments"
 	"github.com/Azure/InnovationEngine/internal/lib"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
@@ -35,10 +34,16 @@ var testCommand = &cobra.Command{
 		streamOutput, _ := cmd.Flags().GetBool("stream-output")
 		subscription, _ := cmd.Flags().GetString("subscription")
 		workingDirectory, _ := cmd.Flags().GetString("working-directory")
-		environment, _ := cmd.Flags().GetString("environment")
 		generateReport, _ := cmd.Flags().GetString("report")
 
 		environmentVariables, _ := cmd.Flags().GetStringArray("var")
+
+		environmentSetting, err := getEnvironmentSetting(cmd)
+		if err != nil {
+			logging.GlobalLogger.Errorf("Error resolving environment: %s", err)
+			fmt.Printf("Error resolving environment: %s\n", err)
+			return err
+		}
 
 		cliEnvironmentVariables, err := lib.ParseEnvironmentVariableAssignments(environmentVariables)
 		if err != nil {
@@ -55,7 +60,7 @@ var testCommand = &cobra.Command{
 			Subscription:     subscription,
 			CorrelationId:    "",
 			WorkingDirectory: workingDirectory,
-			Environment:      environments.Environment(environment),
+			Environment:      environmentSetting,
 			ReportFile:       generateReport,
 		})
 		if err != nil {
