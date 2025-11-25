@@ -58,6 +58,8 @@ func (e *Engine) ExecuteScenario(scenario *common.Scenario) error {
 			fmt.Println()
 		}
 		err := e.ExecuteAndRenderSteps(scenario.Steps, lib.CopyMap(scenario.Environment))
+		// Always print a consolidated summary of missing prerequisites at the end of scenario execution.
+		common.SummarizeMissingPrerequisites()
 		return err
 	})
 }

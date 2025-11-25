@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/Azure/InnovationEngine/internal/lib"
@@ -58,18 +59,21 @@ func injectPrerequisitesRecursively(
 		}
 		seenPrereqs[url] = true
 
-		// Explicit pre-check for local file existence to avoid bubbling up an error.
+		// Explicit pre-check for local file existence to avoid bubbling up an error. We
+		// record the warning for end-of-scenario summarization instead of emitting it
+		// immediately to avoid noisy logs at the start of execution.
 		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") && !fs.FileExists(url) {
 			msg := fmt.Sprintf("Prerequisite '%s' not found (continuing without it)", url)
-			logging.GlobalLogger.Warn(msg)
+			RegisterMissingPrerequisite(msg)
 			continue
 		}
 
 		prerequisiteSource, err := resolveMarkdownSource(url)
 		if err != nil {
-			// When a prerequisite document is not found or cannot be loaded output a warning and continue.
+			// When a prerequisite document is not found or cannot be loaded record a warning
+			// and continue. The message will be emitted once at the end of the scenario.
 			msg := fmt.Sprintf("Prerequisite '%s' could not be loaded: %v (continuing without it)", url, err)
-			logging.GlobalLogger.Warn(msg)
+			RegisterMissingPrerequisite(msg)
 			continue
 		}
 
@@ -108,7 +112,6 @@ func injectPrerequisitesRecursively(
 			seenPrereqs,
 			prerequisiteSectionUsed,
 		)
-
 		prerequisiteCodeBlocks := parsers.ExtractCodeBlocksFromAst(prerequisiteMarkdown, prerequisiteSource, languagesToExecute, url)
 
 		// Partition prerequisite code blocks into verification and non-verification blocks.
@@ -250,6 +253,42 @@ func groupCodeBlocksIntoSteps(blocks []parsers.CodeBlock) []Step {
 	}
 
 	return groupedSteps
+}
+
+// missingPrereqMessages holds any missing/unloadable prerequisite warnings for the current process.
+// This is intentionally package-level so we can emit a single summary at the end of scenario execution.
+var missingPrereqMessages []string
+
+// RegisterMissingPrerequisite records a warning message about a missing or unloadable prerequisite for
+// later summarization. Duplicates are allowed here and will be de-duplicated when summarized.
+func RegisterMissingPrerequisite(msg string) {
+	missingPrereqMessages = append(missingPrereqMessages, msg)
+}
+
+// SummarizeMissingPrerequisites logs a consolidated, de-duplicated summary of any missing prerequisites.
+// Intended to be called once at the end of scenario execution.
+func SummarizeMissingPrerequisites() {
+	if len(missingPrereqMessages) == 0 {
+		return
+	}
+
+	// De-duplicate while preserving stable output order.
+	seen := make(map[string]bool)
+	unique := make([]string, 0, len(missingPrereqMessages))
+	for _, m := range missingPrereqMessages {
+		if !seen[m] {
+			seen[m] = true
+			unique = append(unique, m)
+		}
+	}
+	// Sort for deterministic output when there are many, then re-log each warning.
+	sort.Strings(unique)
+	for _, m := range unique {
+		logging.GlobalLogger.Warn(m)
+	}
+
+	// Reset so subsequent scenarios in the same process start clean.
+	missingPrereqMessages = nil
 }
 
 func extractIntroTextBeforeSection(source []byte, sectionTitle string) string {
