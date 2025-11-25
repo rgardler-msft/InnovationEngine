@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/Azure/InnovationEngine/internal/engine/common"
-	"github.com/Azure/InnovationEngine/internal/lib"
 	"github.com/Azure/InnovationEngine/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -22,23 +21,15 @@ var inspectCommand = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Short: "Execute a document in inspect mode.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		markdownFile := args[0]
-		if markdownFile == "" {
-			return commandError(cmd, nil, true, "no markdown file specified")
-		}
-
-		environmentVariables, _ := cmd.Flags().GetStringArray("var")
-		// features, _ := cmd.Flags().GetStringArray("feature")
-
-		cliEnvironmentVariables, err := lib.ParseEnvironmentVariableAssignments(environmentVariables)
+		opts, err := bindExecutionOptions(cmd, args)
 		if err != nil {
-			return commandError(cmd, err, true, "invalid --var assignment")
+			return handleExecutionOptionError(cmd, err)
 		}
-		// Parse the markdown file and create a scenario
+
 		scenario, err := common.CreateScenarioFromMarkdown(
-			markdownFile,
+			opts.MarkdownPath,
 			[]string{"bash", "azurecli", "azurecli-inspect", "terraform"},
-			cliEnvironmentVariables,
+			opts.EnvironmentVariables,
 		)
 		if err != nil {
 			return commandError(cmd, err, false, "error creating scenario")

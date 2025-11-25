@@ -3,7 +3,6 @@ package commands
 import (
 	"os"
 
-	"github.com/Azure/InnovationEngine/internal/engine"
 	"github.com/Azure/InnovationEngine/internal/engine/common"
 	"github.com/Azure/InnovationEngine/internal/lib"
 	"github.com/Azure/InnovationEngine/internal/logging"
@@ -56,16 +55,9 @@ var executeCommand = &cobra.Command{
 			return commandError(cmd, err, false, "error creating scenario")
 		}
 
-		innovationEngine, err := engineNewEngine(engine.EngineConfiguration{
-			Verbose:          opts.Verbose,
-			DoNotDelete:      opts.DoNotDelete,
-			StreamOutput:     opts.StreamOutput,
-			Subscription:     opts.Subscription,
-			CorrelationId:    opts.CorrelationID,
-			Environment:      opts.Environment,
-			WorkingDirectory: opts.WorkingDirectory,
-			RenderValues:     opts.RenderValues,
-		})
+		cfg := buildEngineConfiguration(opts)
+
+		innovationEngine, err := engineNewEngine(cfg)
 		if err != nil {
 			return commandError(cmd, err, false, "error creating engine")
 		}

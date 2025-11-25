@@ -50,17 +50,32 @@ func runRootWithArgs(t *testing.T, args ...string) error {
 }
 
 // patchEngineNew swaps engine.NewEngine with a stub for the duration of a test.
-func patchEngineNew(t *testing.T) *[]enginepkg.EngineConfiguration {
+
+func patchEngineNew(t *testing.T) *int {
 	original := engineNewEngine
-	stubCalls := make([]enginepkg.EngineConfiguration, 0)
+	callCount := 0
 	engineNewEngine = func(cfg enginepkg.EngineConfiguration) (engineRunner, error) {
-		stubCalls = append(stubCalls, cfg)
+		callCount++
 		return stubEngine{}, nil
 	}
 	t.Cleanup(func() {
 		engineNewEngine = original
 	})
-	return &stubCalls
+	return &callCount
+}
+
+func captureEngineConfigurations(t *testing.T) *[]enginepkg.EngineConfiguration {
+	original := buildEngineConfiguration
+	captured := make([]enginepkg.EngineConfiguration, 0)
+	buildEngineConfiguration = func(opts *executionOptions, overrides ...func(*enginepkg.EngineConfiguration)) enginepkg.EngineConfiguration {
+		cfg := original(opts, overrides...)
+		captured = append(captured, cfg)
+		return cfg
+	}
+	t.Cleanup(func() {
+		buildEngineConfiguration = original
+	})
+	return &captured
 }
 
 type stubEngine struct{}
@@ -173,42 +188,54 @@ func TestInspectCommand_Succeeds(t *testing.T) {
 
 func TestExecuteCommand_Succeeds(t *testing.T) {
 	markdown := writeTempScenario(t, "Execute Scenario")
-	calls := patchEngineNew(t)
+	configs := captureEngineConfigurations(t)
+	callCount := patchEngineNew(t)
 	if err := runRootWithArgs(t, "execute", markdown); err != nil {
 		t.Fatalf("execute command should succeed, got %v", err)
 	}
-	if len(*calls) != 1 {
-		t.Fatalf("expected engine.NewEngine to be called once, got %d", len(*calls))
+	if *callCount != 1 {
+		t.Fatalf("expected engine.NewEngine to be called once, got %d", *callCount)
 	}
-	if (*calls)[0].Environment != environments.EnvironmentsLocal {
-		t.Fatalf("expected environment to default to local, got %s", (*calls)[0].Environment)
+	if len(*configs) != 1 {
+		t.Fatalf("expected engine configuration to be built once, got %d", len(*configs))
+	}
+	if (*configs)[0].Environment != environments.EnvironmentsLocal {
+		t.Fatalf("expected environment to default to local, got %s", (*configs)[0].Environment)
 	}
 }
 
 func TestTestCommand_Succeeds(t *testing.T) {
 	markdown := writeTempScenario(t, "Test Scenario")
-	calls := patchEngineNew(t)
+	configs := captureEngineConfigurations(t)
+	callCount := patchEngineNew(t)
 	if err := runRootWithArgs(t, "test", markdown); err != nil {
 		t.Fatalf("test command should succeed, got %v", err)
 	}
-	if len(*calls) != 1 {
-		t.Fatalf("expected engine.NewEngine to be called once, got %d", len(*calls))
+	if *callCount != 1 {
+		t.Fatalf("expected engine.NewEngine to be called once, got %d", *callCount)
 	}
-	if (*calls)[0].ReportFile != "" {
-		t.Fatalf("expected default test command report file to be empty, got %s", (*calls)[0].ReportFile)
+	if len(*configs) != 1 {
+		t.Fatalf("expected engine configuration to be built once, got %d", len(*configs))
+	}
+	if (*configs)[0].ReportFile != "" {
+		t.Fatalf("expected default test command report file to be empty, got %s", (*configs)[0].ReportFile)
 	}
 }
 
 func TestInteractiveCommand_Succeeds(t *testing.T) {
 	markdown := writeTempScenario(t, "Interactive Scenario")
-	calls := patchEngineNew(t)
+	configs := captureEngineConfigurations(t)
+	callCount := patchEngineNew(t)
 	if err := runRootWithArgs(t, "interactive", markdown); err != nil {
 		t.Fatalf("interactive command should succeed, got %v", err)
 	}
-	if len(*calls) != 1 {
-		t.Fatalf("expected engine.NewEngine to be called once, got %d", len(*calls))
+	if *callCount != 1 {
+		t.Fatalf("expected engine.NewEngine to be called once, got %d", *callCount)
 	}
-	if !(*calls)[0].StreamOutput {
-		t.Fatalf("interactive command should force StreamOutput, got %v", (*calls)[0].StreamOutput)
+	if len(*configs) != 1 {
+		t.Fatalf("expected engine configuration to be built once, got %d", len(*configs))
+	}
+	if !(*configs)[0].StreamOutput {
+		t.Fatalf("interactive command should force StreamOutput, got %v", (*configs)[0].StreamOutput)
 	}
 }

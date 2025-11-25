@@ -25,16 +25,15 @@ var testCommand = &cobra.Command{
 			return handleExecutionOptionError(cmd, err)
 		}
 
-		innovationEngine, err := engineNewEngine(engine.EngineConfiguration{
-			Verbose:          opts.Verbose,
-			DoNotDelete:      false,
-			StreamOutput:     opts.StreamOutput,
-			Subscription:     opts.Subscription,
-			CorrelationId:    "",
-			WorkingDirectory: opts.WorkingDirectory,
-			Environment:      opts.Environment,
-			ReportFile:       opts.ReportFile,
-		})
+		cfg := buildEngineConfiguration(
+			opts,
+			func(cfg *engine.EngineConfiguration) {
+				cfg.DoNotDelete = false
+				cfg.CorrelationId = ""
+			},
+		)
+
+		innovationEngine, err := engineNewEngine(cfg)
 		if err != nil {
 			return commandError(cmd, err, false, "error creating engine")
 		}

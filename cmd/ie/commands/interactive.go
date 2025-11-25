@@ -51,16 +51,14 @@ var interactiveCommand = &cobra.Command{
 			return commandError(cmd, err, false, "error creating scenario")
 		}
 
-		innovationEngine, err := engineNewEngine(engine.EngineConfiguration{
-			Verbose:          opts.Verbose,
-			DoNotDelete:      opts.DoNotDelete,
-			StreamOutput:     true, // Interactive mode always streams
-			Subscription:     opts.Subscription,
-			CorrelationId:    opts.CorrelationID,
-			Environment:      opts.Environment,
-			WorkingDirectory: opts.WorkingDirectory,
-			RenderValues:     opts.RenderValues,
-		})
+		cfg := buildEngineConfiguration(
+			opts,
+			func(cfg *engine.EngineConfiguration) {
+				cfg.StreamOutput = true // Interactive mode always streams
+			},
+		)
+
+		innovationEngine, err := engineNewEngine(cfg)
 		if err != nil {
 			return commandError(cmd, err, false, "error creating engine")
 		}
