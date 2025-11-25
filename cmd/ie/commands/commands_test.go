@@ -31,6 +31,12 @@ func runRootWithArgs(t *testing.T, args ...string) error {
 		)
 	rootCommand.PersistentFlags().
 		String(
+			"log-path",
+			"",
+			"",
+		)
+	rootCommand.PersistentFlags().
+		String(
 			"environment",
 			"local",
 			"",
@@ -42,6 +48,11 @@ func runRootWithArgs(t *testing.T, args ...string) error {
 			"",
 		)
 	resetCommandTreeFlags(rootCommand)
+	tempLogPath := filepath.Join(t.TempDir(), "ie.log")
+	if err := rootCommand.PersistentFlags().Set("log-path", tempLogPath); err != nil {
+		t.Fatalf("failed to set log path flag: %v", err)
+	}
+	t.Setenv(logPathEnvVar, tempLogPath)
 
 	rootCommand.SetArgs(args)
 	rootCommand.SetOut(&bytes.Buffer{})

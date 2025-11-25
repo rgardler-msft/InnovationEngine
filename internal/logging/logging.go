@@ -1,8 +1,10 @@
 package logging
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -61,7 +63,12 @@ func LevelFromString(level string) Level {
 
 var GlobalLogger = logrus.New()
 
-func Init(level Level) {
+const (
+	DefaultLogFile  = "ie.log"
+	maxLogSnapshots = 5
+)
+
+func Init(level Level, logPath string) {
 	GlobalLogger.SetFormatter(&logrus.TextFormatter{
 		DisableColors: false,
 		FullTimestamp: true,
@@ -71,17 +78,79 @@ func Init(level Level) {
 	GlobalLogger.SetReportCaller(false)
 	GlobalLogger.SetLevel(level.Integer())
 
-	file, err := os.OpenFile("ie.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-
-	if err == nil {
-		GlobalLogger.SetOutput(file)
+	writer, err := configureLogWriter(logPath)
+	if err != nil {
+		GlobalLogger.SetOutput(os.Stdout)
+		GlobalLogger.Warnf("Failed to configure log file '%s', using stdout: %v", logPath, err)
+	} else if writer != nil {
+		GlobalLogger.SetOutput(writer)
 	} else {
 		GlobalLogger.SetOutput(os.Stdout)
-		GlobalLogger.Warn("Failed to log to file, using default stderr")
 	}
 
 	// Add a hook to always echo warnings to the console in orange so they are visible
 	GlobalLogger.AddHook(&warnConsoleHook{})
+}
+
+func configureLogWriter(logPath string) (*os.File, error) {
+	path := strings.TrimSpace(logPath)
+	if path == "" {
+		return nil, nil
+	}
+
+	if err := ensureLogDirectory(path); err != nil {
+		return nil, err
+	}
+
+	if err := rotateLogs(path, maxLogSnapshots); err != nil {
+		return nil, err
+	}
+
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o666)
+	if err != nil {
+		return nil, err
+	}
+
+	return file, nil
+}
+
+func ensureLogDirectory(path string) error {
+	dir := filepath.Dir(path)
+	if dir == "." || dir == "" {
+		return nil
+	}
+	return os.MkdirAll(dir, 0o755)
+}
+
+func rotateLogs(basePath string, maxSnapshots int) error {
+	if maxSnapshots <= 1 {
+		return nil
+	}
+
+	oldest := fmt.Sprintf("%s.%d", basePath, maxSnapshots-1)
+	if err := os.Remove(oldest); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	for i := maxSnapshots - 2; i >= 1; i-- {
+		src := fmt.Sprintf("%s.%d", basePath, i)
+		dst := fmt.Sprintf("%s.%d", basePath, i+1)
+		if err := os.Rename(src, dst); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return err
+		}
+	}
+
+	if err := os.Rename(basePath, fmt.Sprintf("%s.1", basePath)); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+
+	return nil
 }
 
 // warnConsoleHook duplicates warning messages to stderr with an orange color.

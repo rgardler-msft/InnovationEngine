@@ -215,6 +215,8 @@ ie execute tutorial.md --verbose --log-level=trace
 
 Tip: Keep routine automation at `--log-level=info` without `--verbose` to reduce noise; escalate only when investigating issues.
 
+You can also redirect the persistent log file with `--log-path /some/output/dir/ie.log` (or by setting the `IE_LOG_PATH` environment variable). Innovation Engine rotates the last five log snapshots (`ie.log` through `ie.log.4`) automatically, deleting the oldest file before creating a new one, so long-lived sessions and CI runs do not grow the log directory unbounded.
+
 ### Setting Up GitHub Actions to use Innovation Engine
 
 After documentation is set up to take advantage of automated testing a github 

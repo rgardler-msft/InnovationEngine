@@ -1,10 +1,11 @@
 package commands
 
 import (
+	"os"
+
 	"github.com/Azure/InnovationEngine/internal/lib"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 // / Register the command with our command runner.

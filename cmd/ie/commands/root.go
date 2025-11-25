@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const logPathEnvVar = "IE_LOG_PATH"
+
 // The root command for the CLI. Currently initializes the logging for all other
 // commands.
 var rootCommand = &cobra.Command{
@@ -19,7 +21,20 @@ var rootCommand = &cobra.Command{
 		if err != nil {
 			return commandError(cmd, err, false, "error getting log level")
 		}
-		logging.Init(logging.LevelFromString(logLevel))
+
+		logPath, err := cmd.Flags().GetString("log-path")
+		if err != nil {
+			return commandError(cmd, err, false, "error getting log path")
+		}
+		if logPath == "" {
+			if envPath := os.Getenv(logPathEnvVar); envPath != "" {
+				logPath = envPath
+			} else {
+				logPath = logging.DefaultLogFile
+			}
+		}
+
+		logging.Init(logging.LevelFromString(logLevel), logPath)
 
 		if _, err := getEnvironmentSetting(cmd); err != nil {
 			return commandError(cmd, err, false, "error resolving environment")
@@ -36,6 +51,12 @@ func ExecuteCLI() {
 			"log-level",
 			string(logging.Debug),
 			"Set file logging level (trace|debug|info|warn|error|fatal). Controls entries written to ie.log; --verbose enriches interactive console separately",
+		)
+	rootCommand.PersistentFlags().
+		String(
+			"log-path",
+			"",
+			fmt.Sprintf("Path to ie log output (default %s, overridable via %s)", logging.DefaultLogFile, logPathEnvVar),
 		)
 	rootCommand.PersistentFlags().
 		String(

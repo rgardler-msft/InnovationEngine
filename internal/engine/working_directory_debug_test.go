@@ -16,7 +16,7 @@ import (
 // before executing a command block.
 func TestWorkingDirectoryDebugLine(t *testing.T) {
 	// Initialize logger at debug level to exercise the condition.
-	logging.Init(logging.Debug)
+	logging.Init(logging.Debug, "")
 
 	// Build a minimal scenario step with a single bash command.
 	step := common.Step{
