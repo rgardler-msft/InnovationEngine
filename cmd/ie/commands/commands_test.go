@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	enginepkg "github.com/Azure/InnovationEngine/internal/engine"
+	"github.com/Azure/InnovationEngine/internal/engine/common"
 	"github.com/Azure/InnovationEngine/internal/engine/environments"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
@@ -39,6 +41,28 @@ func runRootWithArgs(t *testing.T, args ...string) error {
 	rootCommand.SetOut(&bytes.Buffer{})
 	rootCommand.SetErr(&bytes.Buffer{})
 	return rootCommand.Execute()
+}
+
+// patchEngineNew swaps engine.NewEngine with a stub for the duration of a test.
+func patchEngineNew(t *testing.T) *[]enginepkg.EngineConfiguration {
+	original := engineNewEngine
+	stubCalls := make([]enginepkg.EngineConfiguration, 0)
+	engineNewEngine = func(cfg enginepkg.EngineConfiguration) (engineRunner, error) {
+		stubCalls = append(stubCalls, cfg)
+		return stubEngine{}, nil
+	}
+	t.Cleanup(func() {
+		engineNewEngine = original
+	})
+	return &stubCalls
+}
+
+type stubEngine struct{}
+
+func (stubEngine) ExecuteScenario(*common.Scenario) error { return nil }
+func (stubEngine) TestScenario(*common.Scenario) error    { return nil }
+func (stubEngine) InteractWithScenario(*common.Scenario) error {
+	return nil
 }
 
 func resetCommandTreeFlags(cmd *cobra.Command) {
@@ -138,5 +162,47 @@ func TestInspectCommand_Succeeds(t *testing.T) {
 	markdown := writeTempScenario(t, "Temp Scenario")
 	if err := runRootWithArgs(t, "inspect", markdown); err != nil {
 		t.Fatalf("inspect command should succeed for valid scenario, got %v", err)
+	}
+}
+
+func TestExecuteCommand_Succeeds(t *testing.T) {
+	markdown := writeTempScenario(t, "Execute Scenario")
+	calls := patchEngineNew(t)
+	if err := runRootWithArgs(t, "execute", markdown); err != nil {
+		t.Fatalf("execute command should succeed, got %v", err)
+	}
+	if len(*calls) != 1 {
+		t.Fatalf("expected engine.NewEngine to be called once, got %d", len(*calls))
+	}
+	if (*calls)[0].Environment != environments.EnvironmentsLocal {
+		t.Fatalf("expected environment to default to local, got %s", (*calls)[0].Environment)
+	}
+}
+
+func TestTestCommand_Succeeds(t *testing.T) {
+	markdown := writeTempScenario(t, "Test Scenario")
+	calls := patchEngineNew(t)
+	if err := runRootWithArgs(t, "test", markdown); err != nil {
+		t.Fatalf("test command should succeed, got %v", err)
+	}
+	if len(*calls) != 1 {
+		t.Fatalf("expected engine.NewEngine to be called once, got %d", len(*calls))
+	}
+	if (*calls)[0].ReportFile != "" {
+		t.Fatalf("expected default test command report file to be empty, got %s", (*calls)[0].ReportFile)
+	}
+}
+
+func TestInteractiveCommand_Succeeds(t *testing.T) {
+	markdown := writeTempScenario(t, "Interactive Scenario")
+	calls := patchEngineNew(t)
+	if err := runRootWithArgs(t, "interactive", markdown); err != nil {
+		t.Fatalf("interactive command should succeed, got %v", err)
+	}
+	if len(*calls) != 1 {
+		t.Fatalf("expected engine.NewEngine to be called once, got %d", len(*calls))
+	}
+	if !(*calls)[0].StreamOutput {
+		t.Fatalf("interactive command should force StreamOutput, got %v", (*calls)[0].StreamOutput)
 	}
 }

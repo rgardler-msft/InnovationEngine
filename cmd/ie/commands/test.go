@@ -44,7 +44,7 @@ var testCommand = &cobra.Command{
 			return commandError(cmd, err, true, "invalid --var assignment")
 		}
 
-		innovationEngine, err := engine.NewEngine(engine.EngineConfiguration{
+		innovationEngine, err := engineNewEngine(engine.EngineConfiguration{
 			Verbose:          verbose,
 			DoNotDelete:      false,
 			StreamOutput:     streamOutput,

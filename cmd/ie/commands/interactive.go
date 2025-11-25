@@ -74,7 +74,7 @@ var interactiveCommand = &cobra.Command{
 			return commandError(cmd, err, false, "error creating scenario")
 		}
 
-		innovationEngine, err := engine.NewEngine(engine.EngineConfiguration{
+		innovationEngine, err := engineNewEngine(engine.EngineConfiguration{
 			Verbose:          verbose,
 			DoNotDelete:      doNotDelete,
 			StreamOutput:     true, // Interactive mode always streams
