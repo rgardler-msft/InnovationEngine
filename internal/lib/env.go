@@ -23,6 +23,32 @@ func GetEnvironmentVariables() map[string]string {
 	return envMap
 }
 
+// ParseEnvironmentVariableAssignments converts CLI-provided KEY=VALUE strings into a
+// map. It returns an error if any entry is not in the expected KEY=VALUE
+// format. This helper is intended for use by commands that accept repeated
+// environment variable flags such as --var.
+func ParseEnvironmentVariableAssignments(assignments []string) (map[string]string, error) {
+	env := make(map[string]string)
+
+	for _, assignment := range assignments {
+		pair := strings.SplitN(assignment, "=", 2)
+		if len(pair) != 2 {
+			return nil, fmt.Errorf("invalid environment variable format: %s", assignment)
+		}
+
+		key := strings.TrimSpace(pair[0])
+		value := pair[1]
+
+		if key == "" {
+			return nil, fmt.Errorf("environment variable name is empty in assignment: %s", assignment)
+		}
+
+		env[key] = value
+	}
+
+	return env, nil
+}
+
 // Location where the environment and working directory state from commands are
 // to be captured and sent to for being able to share state across commands.
 var DefaultEnvironmentStateFile = "/tmp/env-vars"

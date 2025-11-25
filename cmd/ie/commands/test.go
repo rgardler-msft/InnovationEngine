@@ -3,10 +3,10 @@ package commands
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/Azure/InnovationEngine/internal/engine"
 	"github.com/Azure/InnovationEngine/internal/engine/common"
+	"github.com/Azure/InnovationEngine/internal/lib"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
 )
@@ -49,21 +49,12 @@ var testCommand = &cobra.Command{
 
 		environmentVariables, _ := cmd.Flags().GetStringArray("var")
 
-		// Parse the environment variables from the command line into a map
-		cliEnvironmentVariables := make(map[string]string)
-		for _, environmentVariable := range environmentVariables {
-			keyValuePair := strings.SplitN(environmentVariable, "=", 2)
-			if len(keyValuePair) != 2 {
-				logging.GlobalLogger.Errorf(
-					"Error: Invalid environment variable format: %s",
-					environmentVariable,
-				)
-				fmt.Printf("Error: Invalid environment variable format: %s", environmentVariable)
-				cmd.Help()
-				os.Exit(1)
-			}
-
-			cliEnvironmentVariables[keyValuePair[0]] = keyValuePair[1]
+		cliEnvironmentVariables, err := lib.ParseEnvironmentVariableAssignments(environmentVariables)
+		if err != nil {
+			logging.GlobalLogger.Errorf("Error: %s", err)
+			fmt.Printf("Error: %s\n", err)
+			cmd.Help()
+			os.Exit(1)
 		}
 
 		innovationEngine, err := engine.NewEngine(engine.EngineConfiguration{
