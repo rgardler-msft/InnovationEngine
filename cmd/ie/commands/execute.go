@@ -41,12 +41,12 @@ var executeCommand = &cobra.Command{
 	Use:   "execute [markdown file]",
 	Args:  cobra.MinimumNArgs(1),
 	Short: "Execute the commands in an executable document.",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		markdownFile := args[0]
 		if markdownFile == "" {
 			logging.GlobalLogger.Errorf("Error: No markdown file specified.")
 			cmd.Help()
-			os.Exit(1)
+			return fmt.Errorf("no markdown file specified")
 		}
 
 		// Ensure we are in the original invocation directory before parsing
@@ -86,7 +86,7 @@ var executeCommand = &cobra.Command{
 			logging.GlobalLogger.Errorf("Error: %s", err)
 			fmt.Printf("Error: %s\n", err)
 			cmd.Help()
-			os.Exit(1)
+			return err
 		}
 
 		for _, feature := range features {
@@ -100,7 +100,7 @@ var executeCommand = &cobra.Command{
 				)
 				fmt.Printf("Error: Invalid feature: %s\n", feature)
 				cmd.Help()
-				os.Exit(1)
+				return fmt.Errorf("invalid feature: %s", feature)
 			}
 		}
 
@@ -113,7 +113,7 @@ var executeCommand = &cobra.Command{
 		if err != nil {
 			logging.GlobalLogger.Errorf("Error creating scenario: %s", err)
 			fmt.Printf("Error creating scenario: %s", err)
-			os.Exit(1)
+			return fmt.Errorf("error creating scenario: %w", err)
 		}
 
 		innovationEngine, err := engine.NewEngine(engine.EngineConfiguration{
@@ -129,7 +129,7 @@ var executeCommand = &cobra.Command{
 		if err != nil {
 			logging.GlobalLogger.Errorf("Error creating engine: %s", err)
 			fmt.Printf("Error creating engine: %s", err)
-			os.Exit(1)
+			return fmt.Errorf("error creating engine: %w", err)
 		}
 
 		// Execute the scenario
@@ -137,7 +137,9 @@ var executeCommand = &cobra.Command{
 		if err != nil {
 			logging.GlobalLogger.Errorf("Error executing scenario: %s", err)
 			fmt.Printf("Error executing scenario: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error executing scenario: %w", err)
 		}
+
+		return nil
 	},
 }

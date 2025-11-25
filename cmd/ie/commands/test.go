@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/Azure/InnovationEngine/internal/engine"
 	"github.com/Azure/InnovationEngine/internal/engine/common"
@@ -33,11 +32,11 @@ var testCommand = &cobra.Command{
 	Use:   "test",
 	Args:  cobra.MinimumNArgs(1),
 	Short: "Test document commands against their expected outputs.",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		markdownFile := args[0]
 		if markdownFile == "" {
 			cmd.Help()
-			return
+			return fmt.Errorf("no markdown file specified")
 		}
 
 		verbose, _ := cmd.Flags().GetBool("verbose")
@@ -54,7 +53,7 @@ var testCommand = &cobra.Command{
 			logging.GlobalLogger.Errorf("Error: %s", err)
 			fmt.Printf("Error: %s\n", err)
 			cmd.Help()
-			os.Exit(1)
+			return err
 		}
 
 		innovationEngine, err := engine.NewEngine(engine.EngineConfiguration{
@@ -70,7 +69,7 @@ var testCommand = &cobra.Command{
 		if err != nil {
 			logging.GlobalLogger.Errorf("Error creating engine %s", err)
 			fmt.Printf("Error creating engine %s", err)
-			os.Exit(1)
+			return fmt.Errorf("error creating engine: %w", err)
 		}
 
 		scenario, err := common.CreateScenarioFromMarkdown(
@@ -81,14 +80,16 @@ var testCommand = &cobra.Command{
 		if err != nil {
 			logging.GlobalLogger.Errorf("Error creating scenario %s", err)
 			fmt.Printf("Error creating engine %s", err)
-			os.Exit(1)
+			return fmt.Errorf("error creating scenario: %w", err)
 		}
 
 		err = innovationEngine.TestScenario(scenario)
 		if err != nil {
 			logging.GlobalLogger.Errorf("Error testing scenario: %s", err)
 			fmt.Printf("Scenario did not finish successfully.")
-			os.Exit(1)
+			return fmt.Errorf("scenario did not finish successfully: %w", err)
 		}
+
+		return nil
 	},
 }
