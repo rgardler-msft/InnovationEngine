@@ -1,12 +1,10 @@
 package commands
 
 import (
-	"os"
-
-	"github.com/Azure/InnovationEngine/internal/engine/common"
 	"github.com/Azure/InnovationEngine/internal/lib"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
+	"os"
 )
 
 // / Register the command with our command runner.
@@ -46,11 +44,7 @@ var executeCommand = &cobra.Command{
 		}
 
 		// Parse the markdown file and create a scenario
-		scenario, err := common.CreateScenarioFromMarkdown(
-			opts.MarkdownPath,
-			[]string{"bash", "azurecli", "azurecli-interactive", "terraform"},
-			opts.EnvironmentVariables,
-		)
+		scenario, err := createScenarioFromOptions(opts, executionRunnerTypes)
 		if err != nil {
 			return commandError(cmd, err, false, "error creating scenario")
 		}

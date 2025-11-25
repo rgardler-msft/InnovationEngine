@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Azure/InnovationEngine/internal/engine"
+	"github.com/Azure/InnovationEngine/internal/engine/common"
 	"github.com/Azure/InnovationEngine/internal/engine/environments"
 	"github.com/spf13/cobra"
 )
@@ -191,4 +192,57 @@ func TestBuildEngineConfiguration(t *testing.T) {
 	if !reflect.DeepEqual(cfg, buildEngineConfiguration(base)) {
 		t.Fatalf("expected builder to be deterministic for same input")
 	}
+}
+
+func TestCreateScenarioFromOptions(t *testing.T) {
+	t.Run("nil options", func(t *testing.T) {
+		if _, err := createScenarioFromOptions(nil, nil); err == nil {
+			t.Fatalf("expected error for nil options")
+		}
+	})
+
+	t.Run("defaults runners when not provided", func(t *testing.T) {
+		opts := &executionOptions{
+			MarkdownPath:         "scenario.md",
+			EnvironmentVariables: map[string]string{"KEY": "value"},
+		}
+		called := false
+		original := commonCreateScenarioFromMarkdown
+		commonCreateScenarioFromMarkdown = func(markdownPath string, runners []string, envVars map[string]string) (*common.Scenario, error) {
+			called = true
+			if markdownPath != opts.MarkdownPath {
+				t.Fatalf("unexpected markdown path: %s", markdownPath)
+			}
+			if !reflect.DeepEqual(runners, executionRunnerTypes) {
+				t.Fatalf("expected default runners, got %v", runners)
+			}
+			if !reflect.DeepEqual(envVars, opts.EnvironmentVariables) {
+				t.Fatalf("expected env vars to match, got %v", envVars)
+			}
+			return &common.Scenario{Name: "test"}, nil
+		}
+		t.Cleanup(func() { commonCreateScenarioFromMarkdown = original })
+		if _, err := createScenarioFromOptions(opts, nil); err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if !called {
+			t.Fatalf("expected helper to call scenario creation")
+		}
+	})
+
+	t.Run("uses provided runners", func(t *testing.T) {
+		opts := &executionOptions{MarkdownPath: "scenario.md"}
+		customRunners := []string{"custom"}
+		original := commonCreateScenarioFromMarkdown
+		commonCreateScenarioFromMarkdown = func(markdownPath string, runners []string, envVars map[string]string) (*common.Scenario, error) {
+			if !reflect.DeepEqual(runners, customRunners) {
+				t.Fatalf("expected custom runners, got %v", runners)
+			}
+			return &common.Scenario{Name: "test"}, nil
+		}
+		t.Cleanup(func() { commonCreateScenarioFromMarkdown = original })
+		if _, err := createScenarioFromOptions(opts, customRunners); err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
 }

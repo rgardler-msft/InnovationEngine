@@ -2,7 +2,6 @@ package commands
 
 import (
 	"github.com/Azure/InnovationEngine/internal/engine"
-	"github.com/Azure/InnovationEngine/internal/engine/common"
 	"github.com/spf13/cobra"
 )
 
@@ -38,11 +37,7 @@ var testCommand = &cobra.Command{
 			return commandError(cmd, err, false, "error creating engine")
 		}
 
-		scenario, err := common.CreateScenarioFromMarkdown(
-			opts.MarkdownPath,
-			[]string{"bash", "azurecli", "azurecli-interactive", "terraform"},
-			opts.EnvironmentVariables,
-		)
+		scenario, err := createScenarioFromOptions(opts, executionRunnerTypes)
 		if err != nil {
 			return commandError(cmd, err, false, "error creating scenario")
 		}

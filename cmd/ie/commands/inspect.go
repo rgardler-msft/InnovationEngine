@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 
-	"github.com/Azure/InnovationEngine/internal/engine/common"
 	"github.com/Azure/InnovationEngine/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -26,11 +25,7 @@ var inspectCommand = &cobra.Command{
 			return handleExecutionOptionError(cmd, err)
 		}
 
-		scenario, err := common.CreateScenarioFromMarkdown(
-			opts.MarkdownPath,
-			[]string{"bash", "azurecli", "azurecli-inspect", "terraform"},
-			opts.EnvironmentVariables,
-		)
+		scenario, err := createScenarioFromOptions(opts, inspectRunnerTypes)
 		if err != nil {
 			return commandError(cmd, err, false, "error creating scenario")
 		}

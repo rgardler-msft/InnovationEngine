@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Azure/InnovationEngine/internal/engine/common"
 	"github.com/spf13/cobra"
 )
 
@@ -22,10 +21,7 @@ var toBashCommand = &cobra.Command{
 		}
 
 		// Parse the markdown file and create a scenario
-		scenario, err := common.CreateScenarioFromMarkdown(
-			opts.MarkdownPath,
-			[]string{"bash", "azurecli", "azurecli-interactive", "terraform"},
-			opts.EnvironmentVariables)
+		scenario, err := createScenarioFromOptions(opts, executionRunnerTypes)
 		if err != nil {
 			return commandError(cmd, err, false, "error creating scenario")
 		}
