@@ -482,8 +482,8 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 	)
 	environments.ReportAzureStatus(azureStatus, string(e.Configuration.Environment))
 
-	switch e.Configuration.Environment {
-	case environments.EnvironmentsAzure, environments.EnvironmentsOCD:
+	switch {
+	case e.Configuration.Environment.IsAzureLike():
 		logging.GlobalLogger.Info(
 			"Cleaning environment variable file located at /tmp/env-vars",
 		)

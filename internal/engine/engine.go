@@ -85,7 +85,7 @@ func (e *Engine) TestScenario(scenario *common.Scenario) error {
 		}
 
 		var flags []tea.ProgramOption
-		if environments.EnvironmentsGithubAction == e.Configuration.Environment {
+		if e.Configuration.Environment.IsGithubAction() {
 			flags = append(
 				flags,
 				tea.WithoutRenderer(),
@@ -192,7 +192,7 @@ func (e *Engine) InteractWithScenario(scenario *common.Scenario) error {
 		}
 
 		switch e.Configuration.Environment {
-		case environments.EnvironmentsAzure, environments.EnvironmentsOCD:
+	case environments.EnvironmentsAzure, environments.EnvironmentsOCD:
 
 			logging.GlobalLogger.Info(
 				"Cleaning environment variable file located at /tmp/env-vars",

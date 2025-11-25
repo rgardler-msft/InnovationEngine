@@ -14,6 +14,23 @@ const (
 	EnvironmentsAzure        Environment = "azure"
 )
 
+// IsGithubAction reports whether this Environment represents a GitHub Actions run.
+func (e Environment) IsGithubAction() bool {
+	return e == EnvironmentsGithubAction
+}
+
+// IsAzureLike reports whether this Environment represents an Azure-hosted
+// execution context where we should use non-interactive BubbleTea options
+// and clean up remote temp files.
+func (e Environment) IsAzureLike() bool {
+	switch e {
+	case EnvironmentsAzure, EnvironmentsOCD:
+		return true
+	default:
+		return false
+	}
+}
+
 // Check if the environment is valid.
 func IsValidEnvironment(environment string) bool {
 	switch Environment(environment) {
