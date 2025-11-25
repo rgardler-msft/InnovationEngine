@@ -1,12 +1,9 @@
 package commands
 
 import (
-	"fmt"
-
 	"github.com/Azure/InnovationEngine/internal/engine"
 	"github.com/Azure/InnovationEngine/internal/engine/common"
 	"github.com/Azure/InnovationEngine/internal/lib"
-	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
 )
 
@@ -26,8 +23,7 @@ var testCommand = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		markdownFile := args[0]
 		if markdownFile == "" {
-			cmd.Help()
-			return fmt.Errorf("no markdown file specified")
+			return commandError(cmd, nil, true, "no markdown file specified")
 		}
 
 		verbose, _ := cmd.Flags().GetBool("verbose")
@@ -40,17 +36,12 @@ var testCommand = &cobra.Command{
 
 		environmentSetting, err := getEnvironmentSetting(cmd)
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error resolving environment: %s", err)
-			fmt.Printf("Error resolving environment: %s\n", err)
-			return err
+			return commandError(cmd, err, false, "error resolving environment")
 		}
 
 		cliEnvironmentVariables, err := lib.ParseEnvironmentVariableAssignments(environmentVariables)
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error: %s", err)
-			fmt.Printf("Error: %s\n", err)
-			cmd.Help()
-			return err
+			return commandError(cmd, err, true, "invalid --var assignment")
 		}
 
 		innovationEngine, err := engine.NewEngine(engine.EngineConfiguration{
@@ -64,9 +55,7 @@ var testCommand = &cobra.Command{
 			ReportFile:       generateReport,
 		})
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error creating engine %s", err)
-			fmt.Printf("Error creating engine %s", err)
-			return fmt.Errorf("error creating engine: %w", err)
+			return commandError(cmd, err, false, "error creating engine")
 		}
 
 		scenario, err := common.CreateScenarioFromMarkdown(
@@ -75,16 +64,12 @@ var testCommand = &cobra.Command{
 			cliEnvironmentVariables,
 		)
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error creating scenario %s", err)
-			fmt.Printf("Error creating engine %s", err)
-			return fmt.Errorf("error creating scenario: %w", err)
+			return commandError(cmd, err, false, "error creating scenario")
 		}
 
 		err = innovationEngine.TestScenario(scenario)
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error testing scenario: %s", err)
-			fmt.Printf("Scenario did not finish successfully.")
-			return fmt.Errorf("scenario did not finish successfully: %w", err)
+			return commandError(cmd, err, false, "scenario did not finish successfully")
 		}
 
 		return nil

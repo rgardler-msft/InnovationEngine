@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/Azure/InnovationEngine/internal/lib"
@@ -27,9 +26,7 @@ var executeCommand = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		markdownFile := args[0]
 		if markdownFile == "" {
-			logging.GlobalLogger.Errorf("Error: No markdown file specified.")
-			cmd.Help()
-			return fmt.Errorf("no markdown file specified")
+			return commandError(cmd, nil, true, "no markdown file specified")
 		}
 
 		// Ensure we are in the original invocation directory before parsing
@@ -59,9 +56,7 @@ var executeCommand = &cobra.Command{
 
 		environmentSetting, err := getEnvironmentSetting(cmd)
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error resolving environment: %s", err)
-			fmt.Printf("Error resolving environment: %s\n", err)
-			return err
+			return commandError(cmd, err, false, "error resolving environment")
 		}
 
 		environmentVariables, _ := cmd.Flags().GetStringArray("var")
@@ -72,10 +67,7 @@ var executeCommand = &cobra.Command{
 
 		cliEnvironmentVariables, err := lib.ParseEnvironmentVariableAssignments(environmentVariables)
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error: %s", err)
-			fmt.Printf("Error: %s\n", err)
-			cmd.Help()
-			return err
+			return commandError(cmd, err, true, "invalid --var assignment")
 		}
 
 		for _, feature := range features {
@@ -83,13 +75,7 @@ var executeCommand = &cobra.Command{
 			case "render-values":
 				renderValues = true
 			default:
-				logging.GlobalLogger.Errorf(
-					"Error: Invalid feature: %s",
-					feature,
-				)
-				fmt.Printf("Error: Invalid feature: %s\n", feature)
-				cmd.Help()
-				return fmt.Errorf("invalid feature: %s", feature)
+				return commandError(cmd, nil, true, "invalid feature: %s", feature)
 			}
 		}
 
@@ -100,9 +86,7 @@ var executeCommand = &cobra.Command{
 			cliEnvironmentVariables,
 		)
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error creating scenario: %s", err)
-			fmt.Printf("Error creating scenario: %s", err)
-			return fmt.Errorf("error creating scenario: %w", err)
+			return commandError(cmd, err, false, "error creating scenario")
 		}
 
 		innovationEngine, err := engine.NewEngine(engine.EngineConfiguration{
@@ -116,17 +100,13 @@ var executeCommand = &cobra.Command{
 			RenderValues:     renderValues,
 		})
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error creating engine: %s", err)
-			fmt.Printf("Error creating engine: %s", err)
-			return fmt.Errorf("error creating engine: %w", err)
+			return commandError(cmd, err, false, "error creating engine")
 		}
 
 		// Execute the scenario
 		err = innovationEngine.ExecuteScenario(scenario)
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error executing scenario: %s", err)
-			fmt.Printf("Error executing scenario: %s\n", err)
-			return fmt.Errorf("error executing scenario: %w", err)
+			return commandError(cmd, err, false, "error executing scenario")
 		}
 
 		return nil

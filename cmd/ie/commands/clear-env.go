@@ -66,12 +66,9 @@ Examples:
 			if err := lib.DeleteEnvironmentStateFile(lib.DefaultEnvironmentStateFile); err != nil {
 				// Don't error if file doesn't exist
 				if !os.IsNotExist(err) {
-					logging.GlobalLogger.Errorf("Error clearing environment variables: %s", err)
-					fmt.Printf("Error clearing environment variables: %s\n", err)
-					return fmt.Errorf("error clearing environment variables: %w", err)
-				} else {
-					fmt.Println("Environment variables state file was already clear.")
+					return commandError(cmd, err, false, "error clearing environment variables")
 				}
+				fmt.Println("Environment variables state file was already clear.")
 			} else {
 				fmt.Println("Environment variables cleared successfully.")
 			}
@@ -82,12 +79,9 @@ Examples:
 			if err := lib.DeleteWorkingDirectoryStateFile(lib.DefaultWorkingDirectoryStateFile); err != nil {
 				// Don't error if file doesn't exist
 				if !os.IsNotExist(err) {
-					logging.GlobalLogger.Errorf("Error clearing working directory state: %s", err)
-					fmt.Printf("Error clearing working directory state: %s\n", err)
-					return fmt.Errorf("error clearing working directory state: %w", err)
-				} else {
-					fmt.Println("Working directory state file was already clear.")
+					return commandError(cmd, err, false, "error clearing working directory state")
 				}
+				fmt.Println("Working directory state file was already clear.")
 			} else {
 				fmt.Println("Working directory state cleared successfully.")
 			}

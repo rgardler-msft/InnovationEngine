@@ -5,7 +5,6 @@ import (
 
 	"github.com/Azure/InnovationEngine/internal/engine/common"
 	"github.com/Azure/InnovationEngine/internal/lib"
-	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/Azure/InnovationEngine/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -25,9 +24,7 @@ var inspectCommand = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		markdownFile := args[0]
 		if markdownFile == "" {
-			logging.GlobalLogger.Errorf("Error: No markdown file specified.")
-			cmd.Help()
-			return fmt.Errorf("no markdown file specified")
+			return commandError(cmd, nil, true, "no markdown file specified")
 		}
 
 		environmentVariables, _ := cmd.Flags().GetStringArray("var")
@@ -35,10 +32,7 @@ var inspectCommand = &cobra.Command{
 
 		cliEnvironmentVariables, err := lib.ParseEnvironmentVariableAssignments(environmentVariables)
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error: %s", err)
-			fmt.Printf("Error: %s\n", err)
-			cmd.Help()
-			return err
+			return commandError(cmd, err, true, "invalid --var assignment")
 		}
 		// Parse the markdown file and create a scenario
 		scenario, err := common.CreateScenarioFromMarkdown(
@@ -47,9 +41,7 @@ var inspectCommand = &cobra.Command{
 			cliEnvironmentVariables,
 		)
 		if err != nil {
-			logging.GlobalLogger.Errorf("Error creating scenario: %s", err)
-			fmt.Printf("Error creating scenario: %s", err)
-			return fmt.Errorf("error creating scenario: %w", err)
+			return commandError(cmd, err, false, "error creating scenario")
 		}
 
 		fmt.Println(ui.ScenarioTitleStyle.Render(scenario.Name))

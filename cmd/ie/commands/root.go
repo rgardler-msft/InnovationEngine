@@ -17,15 +17,12 @@ var rootCommand = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		logLevel, err := cmd.Flags().GetString("log-level")
 		if err != nil {
-			fmt.Printf("Error getting log level: %s", err)
-			return fmt.Errorf("error getting log level: %w", err)
+			return commandError(cmd, err, false, "error getting log level")
 		}
 		logging.Init(logging.LevelFromString(logLevel))
 
 		if _, err := getEnvironmentSetting(cmd); err != nil {
-			fmt.Printf("Error resolving environment: %s", err)
-			logging.GlobalLogger.Errorf("Error resolving environment: %s", err)
-			return fmt.Errorf("error resolving environment: %w", err)
+			return commandError(cmd, err, false, "error resolving environment")
 		}
 
 		return nil
