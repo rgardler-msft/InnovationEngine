@@ -14,17 +14,8 @@ import (
 func init() {
 	rootCommand.AddCommand(inspectCommand)
 
-	// String flags
-	inspectCommand.PersistentFlags().
-		String("correlation-id", "", "Adds a correlation ID to the user agent used by a scenarios azure-cli commands.")
-	inspectCommand.PersistentFlags().
-		String("subscription", "", "Sets the subscription ID used by a scenarios azure-cli commands. Will rely on the default subscription if not set.")
-	inspectCommand.PersistentFlags().
-		String("working-directory", ".", "Sets the working directory for innovation engine to operate out of. Restores the current working directory when finished.")
-
-	// StringArray flags
-	inspectCommand.PersistentFlags().
-		StringArray("var", []string{}, "Sets an environment variable for the scenario. Format: --var <key>=<value>")
+	addCommonExecutionFlags(inspectCommand)
+	addCorrelationFlag(inspectCommand)
 }
 
 var inspectCommand = &cobra.Command{

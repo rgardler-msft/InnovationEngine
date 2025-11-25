@@ -13,19 +13,10 @@ import (
 // / Register the command with our command runner.
 func init() {
 	rootCommand.AddCommand(testCommand)
-	testCommand.PersistentFlags().
-		Bool("verbose", false, "Enable verbose logging & standard output.")
-	testCommand.PersistentFlags().
-		Bool("stream-output", true, "Stream command output in real-time as it's generated (default). Use --stream-output=false to show spinner and display output after completion.")
-	testCommand.PersistentFlags().
-		String("subscription", "", "Sets the subscription ID used by a scenarios azure-cli commands. Will rely on the default subscription if not set.")
-	testCommand.PersistentFlags().
-		String("working-directory", ".", "Sets the working directory for innovation engine to operate out of. Restores the current working directory when finished.")
+
+	addCommonExecutionFlags(testCommand)
 	testCommand.PersistentFlags().
 		String("report", "", "The path to generate a report of the scenario execution. The contents of the report are in JSON and will only be generated when this flag is set.")
-
-	testCommand.PersistentFlags().
-		StringArray("var", []string{}, "Sets an environment variable for the scenario. Format: --var <key>=<value>")
 }
 
 var testCommand = &cobra.Command{

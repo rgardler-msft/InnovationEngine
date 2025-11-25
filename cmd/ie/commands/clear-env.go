@@ -52,7 +52,7 @@ Examples:
 				fmt.Print(" and working directory state")
 			}
 			fmt.Print(". Continue? (y/N): ")
-			
+
 			var response string
 			fmt.Scanln(&response)
 			if response != "y" && response != "Y" && response != "yes" {

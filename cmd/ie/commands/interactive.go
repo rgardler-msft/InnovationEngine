@@ -16,23 +16,8 @@ import (
 func init() {
 	rootCommand.AddCommand(interactiveCommand)
 
-	// Bool flags
-	interactiveCommand.PersistentFlags().
-		Bool("verbose", false, "Show extra console context (working dirs, full command output). For deeper persisted diagnostics use --log-level")
-	interactiveCommand.PersistentFlags().
-		Bool("do-not-delete", false, "Do not delete the Azure resources created by the Azure CLI commands executed.")
-
-	// String flags
-	interactiveCommand.PersistentFlags().
-		String("correlation-id", "", "Adds a correlation ID to the user agent used by a scenarios azure-cli commands.")
-	interactiveCommand.PersistentFlags().
-		String("subscription", "", "Sets the subscription ID used by a scenarios azure-cli commands. Will rely on the default subscription if not set.")
-	interactiveCommand.PersistentFlags().
-		String("working-directory", ".", "Sets the working directory for innovation engine to operate out of. Restores the current working directory when finished.")
-
-	// StringArray flags
-	interactiveCommand.PersistentFlags().
-		StringArray("var", []string{}, "Sets an environment variable for the scenario. Format: --var <key>=<value>")
+	addCommonExecutionFlags(interactiveCommand)
+	addCorrelationFlag(interactiveCommand)
 }
 
 var interactiveCommand = &cobra.Command{
