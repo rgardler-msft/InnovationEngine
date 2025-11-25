@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/InnovationEngine/internal/engine"
 	"github.com/Azure/InnovationEngine/internal/engine/common"
+	"github.com/Azure/InnovationEngine/internal/engine/environments"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
 )
@@ -84,7 +85,7 @@ var interactiveCommand = &cobra.Command{
 			StreamOutput:     true, // Interactive mode always streams
 			Subscription:     subscription,
 			CorrelationId:    correlationId,
-			Environment:      environment,
+			Environment:      environments.Environment(environment),
 			WorkingDirectory: workingDirectory,
 			RenderValues:     renderValues,
 		})

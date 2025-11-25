@@ -5,6 +5,7 @@ import (
 
 	"github.com/Azure/InnovationEngine/internal/engine"
 	"github.com/Azure/InnovationEngine/internal/engine/common"
+	"github.com/Azure/InnovationEngine/internal/engine/environments"
 	"github.com/Azure/InnovationEngine/internal/lib"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
@@ -54,7 +55,7 @@ var testCommand = &cobra.Command{
 			Subscription:     subscription,
 			CorrelationId:    "",
 			WorkingDirectory: workingDirectory,
-			Environment:      environment,
+			Environment:      environments.Environment(environment),
 			ReportFile:       generateReport,
 		})
 		if err != nil {

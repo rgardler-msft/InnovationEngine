@@ -88,7 +88,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 	if err != nil {
 		logging.GlobalLogger.Errorf("Invalid Config: Failed to set subscription: %s", err)
 		azureStatus.SetError(err)
-		environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
+		environments.ReportAzureStatus(azureStatus, string(e.Configuration.Environment))
 		return err
 	}
 
@@ -109,7 +109,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 		azureStatus.AddStep(fmt.Sprintf("%d. %s", stepNumber+1, step.Name), azureCodeBlocks)
 	}
 
-	environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
+	environments.ReportAzureStatus(azureStatus, string(e.Configuration.Environment))
 
 	for stepNumber, step := range stepsToExecute {
 		stepTitle := fmt.Sprintf("%d. %s\n", stepNumber+1, step.Name)
@@ -192,7 +192,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 				if err != nil {
 					logging.GlobalLogger.Errorf("Failed to render command: %s", err.Error())
 					azureStatus.SetError(err)
-					environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
+					environments.ReportAzureStatus(azureStatus, string(e.Configuration.Environment))
 					return err
 				}
 				finalCommandOutput = ui.IndentMultiLineCommand(renderedCommand.StdOut, 4)
@@ -247,11 +247,11 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 				// beginning of the block.
 
 				lines := strings.Count(finalCommandOutput, "\n")
-				
+
 				// When streaming output, we skip spinner rendering since output
 				// will appear in real-time
 				streamOutput := e.Configuration.StreamOutput
-				
+
 				if !streamOutput {
 					terminal.MoveCursorPositionUp(lines)
 					// Render the spinner and hide the cursor.
@@ -337,9 +337,9 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 								environments.AttachResourceURIsToAzureStatus(
 									&azureStatus,
 									resourceGroupName,
-									e.Configuration.Environment,
+									string(e.Configuration.Environment),
 								)
-								environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
+								environments.ReportAzureStatus(azureStatus, string(e.Configuration.Environment))
 
 								return outputComparisonError
 							}
@@ -374,7 +374,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 							}
 
 							if stepNumber != len(stepsToExecute)-1 {
-								environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
+								environments.ReportAzureStatus(azureStatus, string(e.Configuration.Environment))
 							}
 
 						} else {
@@ -398,9 +398,9 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 							environments.AttachResourceURIsToAzureStatus(
 								&azureStatus,
 								resourceGroupName,
-								e.Configuration.Environment,
+								string(e.Configuration.Environment),
 							)
-							environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
+							environments.ReportAzureStatus(azureStatus, string(e.Configuration.Environment))
 
 							return commandErr
 						}
@@ -425,8 +425,8 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 				// one click deployments and does not affect the normal execution flow.
 				if stepNumber == len(stepsToExecute)-1 && patterns.SshCommand.MatchString(commandContent) {
 					azureStatus.Status = "Succeeded"
-					environments.AttachResourceURIsToAzureStatus(&azureStatus, resourceGroupName, e.Configuration.Environment)
-					environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
+					environments.AttachResourceURIsToAzureStatus(&azureStatus, resourceGroupName, string(e.Configuration.Environment))
+					environments.ReportAzureStatus(azureStatus, string(e.Configuration.Environment))
 				}
 
 				output, commandExecutionError := shells.ExecuteBashCommand(
@@ -451,7 +451,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 					}
 
 					if stepNumber != len(stepsToExecute)-1 {
-						environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
+						environments.ReportAzureStatus(azureStatus, string(e.Configuration.Environment))
 					}
 				} else {
 					fmt.Printf("\r  %s \n", ui.ErrorStyle.Render("✗"))
@@ -463,7 +463,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 						// Failure means marker not written; body may still execute later.
 					} else {
 						azureStatus.SetError(commandExecutionError)
-						environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
+						environments.ReportAzureStatus(azureStatus, string(e.Configuration.Environment))
 						return commandExecutionError
 					}
 				}
@@ -478,9 +478,9 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 	environments.AttachResourceURIsToAzureStatus(
 		&azureStatus,
 		resourceGroupName,
-		e.Configuration.Environment,
+		string(e.Configuration.Environment),
 	)
-	environments.ReportAzureStatus(azureStatus, e.Configuration.Environment)
+	environments.ReportAzureStatus(azureStatus, string(e.Configuration.Environment))
 
 	switch e.Configuration.Environment {
 	case environments.EnvironmentsAzure, environments.EnvironmentsOCD:

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Azure/InnovationEngine/internal/engine/common"
+	"github.com/Azure/InnovationEngine/internal/engine/environments"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/Azure/InnovationEngine/internal/parsers"
 )
@@ -30,7 +31,7 @@ func TestWorkingDirectoryDebugLine(t *testing.T) {
 		},
 	}
 
-	e, err := NewEngine(EngineConfiguration{Verbose: true, Environment: "local"})
+	e, err := NewEngine(EngineConfiguration{Verbose: true, Environment: environments.EnvironmentsLocal})
 	if err != nil {
 		t.Fatalf("failed to create engine: %v", err)
 	}

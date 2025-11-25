@@ -294,28 +294,30 @@ func TestPrerequisiteVerificationSkipWrapping(t *testing.T) {
 		t.Fatalf("expected no error creating scenario, got: %v", err)
 	}
 
-	// Scan code blocks for verification and wrapping markers.
-	verificationFound := false
+	// Scan code blocks for our auto-prereq metadata and conditional wrapping.
+	verificationMetadataFound := false
 	markerFound := false
 	wrappedSetupFound := false
 	for _, step := range scenario.Steps {
 		for _, b := range step.CodeBlocks {
-			if b.Header == "Verification" && strings.Contains(b.Content, "Verifying prerequisite:") {
-				verificationFound = true
-				if strings.Contains(b.Content, "touch \"/tmp/prereq_") {
+			// Verification blocks are annotated with ie:auto-prereq-verification metadata.
+			if strings.Contains(b.Content, "# ie:auto-prereq-verification ") {
+				verificationMetadataFound = true
+				if strings.Contains(b.Content, "/tmp/prereq_") {
 					markerFound = true
 				}
 			}
-			if b.Header == "Prerequisites" && strings.Contains(b.Content, "running setup") && strings.Contains(b.Content, "if [ ! -f \"/tmp/prereq_") {
+			// Setup block should be conditionally wrapped with a marker file check.
+			if strings.Contains(b.Content, "running setup") && strings.Contains(b.Content, "if [ ! -f \"/tmp/prereq_") {
 				wrappedSetupFound = true
 			}
 		}
 	}
-	if !verificationFound {
-		t.Fatalf("expected a verification wrapper block to be present")
+	if !verificationMetadataFound {
+		t.Fatalf("expected an auto-prereq verification block to be present")
 	}
 	if !markerFound {
-		t.Fatalf("verification block does not create marker file")
+		t.Fatalf("verification block does not reference marker file")
 	}
 	if !wrappedSetupFound {
 		t.Fatalf("expected setup block to be conditionally wrapped to allow skipping")

@@ -25,7 +25,7 @@ type EngineConfiguration struct {
 	StreamOutput     bool
 	CorrelationId    string
 	Subscription     string
-	Environment      string
+	Environment      environments.Environment
 	WorkingDirectory string
 	RenderValues     bool
 	ReportFile       string
@@ -76,7 +76,7 @@ func (e *Engine) TestScenario(scenario *common.Scenario) error {
 		model, err := test.NewTestModeModel(
 			scenario.Name,
 			e.Configuration.Subscription,
-			e.Configuration.Environment,
+			string(e.Configuration.Environment),
 			stepsToExecute,
 			lib.CopyMap(scenario.Environment),
 		)
@@ -165,7 +165,7 @@ func (e *Engine) InteractWithScenario(scenario *common.Scenario) error {
 		model, err := interactive.NewInteractiveModeModel(
 			scenario.Name,
 			e.Configuration.Subscription,
-			e.Configuration.Environment,
+			string(e.Configuration.Environment),
 			stepsToExecute,
 			lib.CopyMap(scenario.Environment),
 			scenario.GetSourceAsString(),
