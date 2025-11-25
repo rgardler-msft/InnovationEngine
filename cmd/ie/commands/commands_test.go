@@ -35,6 +35,12 @@ func runRootWithArgs(t *testing.T, args ...string) error {
 			"local",
 			"",
 		)
+	rootCommand.PersistentFlags().
+		StringArray(
+			"feature",
+			[]string{},
+			"",
+		)
 	resetCommandTreeFlags(rootCommand)
 
 	rootCommand.SetArgs(args)

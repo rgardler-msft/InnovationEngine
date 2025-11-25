@@ -3,7 +3,6 @@ package commands
 import (
 	"github.com/Azure/InnovationEngine/internal/engine"
 	"github.com/Azure/InnovationEngine/internal/engine/common"
-	"github.com/Azure/InnovationEngine/internal/lib"
 	"github.com/spf13/cobra"
 )
 
@@ -21,47 +20,29 @@ var testCommand = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Short: "Test document commands against their expected outputs.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		markdownFile := args[0]
-		if markdownFile == "" {
-			return commandError(cmd, nil, true, "no markdown file specified")
-		}
-
-		verbose, _ := cmd.Flags().GetBool("verbose")
-		streamOutput, _ := cmd.Flags().GetBool("stream-output")
-		subscription, _ := cmd.Flags().GetString("subscription")
-		workingDirectory, _ := cmd.Flags().GetString("working-directory")
-		generateReport, _ := cmd.Flags().GetString("report")
-
-		environmentVariables, _ := cmd.Flags().GetStringArray("var")
-
-		environmentSetting, err := getEnvironmentSetting(cmd)
+		opts, err := bindExecutionOptions(cmd, args)
 		if err != nil {
-			return commandError(cmd, err, false, "error resolving environment")
-		}
-
-		cliEnvironmentVariables, err := lib.ParseEnvironmentVariableAssignments(environmentVariables)
-		if err != nil {
-			return commandError(cmd, err, true, "invalid --var assignment")
+			return handleExecutionOptionError(cmd, err)
 		}
 
 		innovationEngine, err := engineNewEngine(engine.EngineConfiguration{
-			Verbose:          verbose,
+			Verbose:          opts.Verbose,
 			DoNotDelete:      false,
-			StreamOutput:     streamOutput,
-			Subscription:     subscription,
+			StreamOutput:     opts.StreamOutput,
+			Subscription:     opts.Subscription,
 			CorrelationId:    "",
-			WorkingDirectory: workingDirectory,
-			Environment:      environmentSetting,
-			ReportFile:       generateReport,
+			WorkingDirectory: opts.WorkingDirectory,
+			Environment:      opts.Environment,
+			ReportFile:       opts.ReportFile,
 		})
 		if err != nil {
 			return commandError(cmd, err, false, "error creating engine")
 		}
 
 		scenario, err := common.CreateScenarioFromMarkdown(
-			markdownFile,
+			opts.MarkdownPath,
 			[]string{"bash", "azurecli", "azurecli-interactive", "terraform"},
-			cliEnvironmentVariables,
+			opts.EnvironmentVariables,
 		)
 		if err != nil {
 			return commandError(cmd, err, false, "error creating scenario")
