@@ -11,6 +11,10 @@ import (
 // commandError logs, surfaces, and wraps CLI errors consistently. When
 // showHelp is true, the command's help text is printed after the error.
 func commandError(cmd *cobra.Command, err error, showHelp bool, format string, args ...interface{}) error {
+	if cmd != nil {
+		// Silence Cobra's automatic usage printing; we handle help output explicitly.
+		cmd.SilenceUsage = true
+	}
 	message := fmt.Sprintf(format, args...)
 
 	if err != nil {

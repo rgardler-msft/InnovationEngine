@@ -2,8 +2,10 @@ package commands
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	enginepkg "github.com/Azure/InnovationEngine/internal/engine"
@@ -18,6 +20,12 @@ import (
 // execution error. This exercises the full wiring from rootCommand down to
 // subcommands and their RunE handlers.
 func runRootWithArgs(t *testing.T, args ...string) error {
+	t.Helper()
+	_, _, err := runRootWithArgsCapturing(t, args...)
+	return err
+}
+
+func runRootWithArgsCapturing(t *testing.T, args ...string) (*bytes.Buffer, *bytes.Buffer, error) {
 	t.Helper()
 	// Ensure root-level flags are registered before each Execute call.
 	// In production this is done by ExecuteCLI, but tests call Execute
@@ -54,10 +62,12 @@ func runRootWithArgs(t *testing.T, args ...string) error {
 	}
 	t.Setenv(logPathEnvVar, tempLogPath)
 
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
 	rootCommand.SetArgs(args)
-	rootCommand.SetOut(&bytes.Buffer{})
-	rootCommand.SetErr(&bytes.Buffer{})
-	return rootCommand.Execute()
+	rootCommand.SetOut(stdout)
+	rootCommand.SetErr(stderr)
+	return stdout, stderr, rootCommand.Execute()
 }
 
 // patchEngineNew swaps engine.NewEngine with a stub for the duration of a test.
@@ -94,6 +104,16 @@ type stubEngine struct{}
 func (stubEngine) ExecuteScenario(*common.Scenario) error { return nil }
 func (stubEngine) TestScenario(*common.Scenario) error    { return nil }
 func (stubEngine) InteractWithScenario(*common.Scenario) error {
+	return nil
+}
+
+type failingExecuteEngine struct {
+	err error
+}
+
+func (f failingExecuteEngine) ExecuteScenario(*common.Scenario) error { return f.err }
+func (f failingExecuteEngine) TestScenario(*common.Scenario) error    { return nil }
+func (f failingExecuteEngine) InteractWithScenario(*common.Scenario) error {
 	return nil
 }
 
@@ -212,6 +232,25 @@ func TestExecuteCommand_Succeeds(t *testing.T) {
 	}
 	if (*configs)[0].Environment != environments.EnvironmentsLocal {
 		t.Fatalf("expected environment to default to local, got %s", (*configs)[0].Environment)
+	}
+}
+
+func TestExecuteCommandScenarioFailureDoesNotPrintUsage(t *testing.T) {
+	markdown := writeTempScenario(t, "Execute Failure Scenario")
+	original := engineNewEngine
+	engineNewEngine = func(cfg enginepkg.EngineConfiguration) (engineRunner, error) {
+		return failingExecuteEngine{err: errors.New("boom")}, nil
+	}
+	t.Cleanup(func() {
+		engineNewEngine = original
+	})
+
+	_, stderr, err := runRootWithArgsCapturing(t, "execute", markdown)
+	if err == nil {
+		t.Fatalf("expected error when scenario execution fails")
+	}
+	if strings.Contains(stderr.String(), "Usage:") {
+		t.Fatalf("expected stderr to omit usage, got %q", stderr.String())
 	}
 }
 
