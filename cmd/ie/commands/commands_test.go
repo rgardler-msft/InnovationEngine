@@ -2,9 +2,14 @@ package commands
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/Azure/InnovationEngine/internal/engine/environments"
 	"github.com/Azure/InnovationEngine/internal/logging"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // helper to execute the root Cobra command with args and capture any
@@ -28,6 +33,7 @@ func runRootWithArgs(t *testing.T, args ...string) error {
 			"local",
 			"",
 		)
+	resetCommandTreeFlags(rootCommand)
 
 	rootCommand.SetArgs(args)
 	rootCommand.SetOut(&bytes.Buffer{})
@@ -35,65 +41,74 @@ func runRootWithArgs(t *testing.T, args ...string) error {
 	return rootCommand.Execute()
 }
 
-func TestExecuteCommand_MissingMarkdownFile(t *testing.T) {
-	// When required args are missing, Cobra Arg validation should fail and
-	// return an error before reaching the RunE handler.
-	err := runRootWithArgs(t, "execute")
-	if err == nil {
-		t.Fatalf("expected error when markdown file is missing, got nil")
+func resetCommandTreeFlags(cmd *cobra.Command) {
+	resetFlags := func(flagSet *pflag.FlagSet) {
+		flagSet.VisitAll(func(f *pflag.Flag) {
+			if sliceValue, ok := f.Value.(pflag.SliceValue); ok {
+				_ = sliceValue.Replace([]string{})
+			} else {
+				_ = f.Value.Set(f.DefValue)
+			}
+			f.Changed = false
+		})
+	}
+	resetFlags(cmd.Flags())
+	resetFlags(cmd.PersistentFlags())
+	for _, child := range cmd.Commands() {
+		resetCommandTreeFlags(child)
 	}
 }
 
-func TestExecuteCommand_InvalidEnvVarFormat(t *testing.T) {
-	err := runRootWithArgs(t, "execute", "doc.md", "--var", "INVALID")
-	if err == nil {
-		t.Fatalf("expected error for invalid --var format, got nil")
+func writeTempScenario(t *testing.T, name string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "scenario.md")
+	content := "# " + name + "\n\n## Step\n\n```bash\necho hello\n```\n"
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write temp scenario: %v", err)
+	}
+	return path
+}
+
+func TestCommandsRequireMarkdownArgument(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"execute", []string{"execute"}},
+		{"test", []string{"test"}},
+		{"interactive", []string{"interactive"}},
+		{"inspect", []string{"inspect"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := runRootWithArgs(t, tt.args...)
+			if err == nil {
+				t.Fatalf("expected error for %s with missing markdown file", tt.args[0])
+			}
+		})
 	}
 }
 
-func TestTestCommand_MissingMarkdownFile(t *testing.T) {
-	// When required args are missing, Cobra Arg validation should fail and
-	// return an error before reaching the RunE handler.
-	err := runRootWithArgs(t, "test")
-	if err == nil {
-		t.Fatalf("expected error when markdown file is missing, got nil")
+func TestCommandsRejectInvalidEnvVarFlag(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"execute", []string{"execute", "doc.md", "--var", "INVALID"}},
+		{"test", []string{"test", "doc.md", "--var", "INVALID"}},
+		{"interactive", []string{"interactive", "doc.md", "--var", "INVALID"}},
+		{"inspect", []string{"inspect", "doc.md", "--var", "INVALID"}},
 	}
-}
 
-func TestTestCommand_InvalidEnvVarFormat(t *testing.T) {
-	err := runRootWithArgs(t, "test", "doc.md", "--var", "INVALID")
-	if err == nil {
-		t.Fatalf("expected error for invalid --var format, got nil")
-	}
-}
-
-func TestInteractiveCommand_MissingMarkdownFile(t *testing.T) {
-	// When required args are missing, Cobra Arg validation should fail and
-	// return an error before reaching the RunE handler.
-	err := runRootWithArgs(t, "interactive")
-	if err == nil {
-		t.Fatalf("expected error when markdown file is missing, got nil")
-	}
-}
-
-func TestInteractiveCommand_InvalidEnvVarFormat(t *testing.T) {
-	err := runRootWithArgs(t, "interactive", "doc.md", "--var", "INVALID")
-	if err == nil {
-		t.Fatalf("expected error for invalid --var format, got nil")
-	}
-}
-
-func TestInspectCommand_MissingMarkdownFile(t *testing.T) {
-	err := runRootWithArgs(t, "inspect")
-	if err == nil {
-		t.Fatalf("expected error when markdown file is missing, got nil")
-	}
-}
-
-func TestInspectCommand_InvalidEnvVarFormat(t *testing.T) {
-	err := runRootWithArgs(t, "inspect", "doc.md", "--var", "INVALID")
-	if err == nil {
-		t.Fatalf("expected error for invalid --var format, got nil")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := runRootWithArgs(t, tt.args...)
+			if err == nil {
+				t.Fatalf("expected error for %s with invalid --var", tt.args[0])
+			}
+		})
 	}
 }
 
@@ -102,5 +117,26 @@ func TestClearEnvCommand_ForceNoFiles(t *testing.T) {
 	err := runRootWithArgs(t, "clear-env", "--force")
 	if err != nil {
 		t.Fatalf("expected no error for clear-env --force with no files, got %v", err)
+	}
+}
+
+func TestRootCommandRejectsInvalidEnvironment(t *testing.T) {
+	err := runRootWithArgs(t, "clear-env", "--force", "--environment", "invalid-env")
+	if err == nil {
+		t.Fatalf("expected error for invalid environment flag")
+	}
+}
+
+func TestRootCommandAcceptsKnownEnvironment(t *testing.T) {
+	err := runRootWithArgs(t, "clear-env", "--force", "--environment", string(environments.EnvironmentsAzure))
+	if err != nil {
+		t.Fatalf("expected azure environment to be accepted, got %v", err)
+	}
+}
+
+func TestInspectCommand_Succeeds(t *testing.T) {
+	markdown := writeTempScenario(t, "Temp Scenario")
+	if err := runRootWithArgs(t, "inspect", markdown); err != nil {
+		t.Fatalf("inspect command should succeed for valid scenario, got %v", err)
 	}
 }

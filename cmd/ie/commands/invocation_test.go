@@ -11,6 +11,16 @@ import (
 // Test that when a stale working directory state file exists from a previous run,
 // invoking the CLI logic overwrites it with the original invocation directory.
 func TestOverwriteStaleWorkingDirectoryState(t *testing.T) {
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to capture original working directory: %v", err)
+	}
+	originalInvocation := OriginalInvocationDirectory
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+		OriginalInvocationDirectory = originalInvocation
+	})
+
 	// Create a temporary directory to act as invocation dir.
 	tempDir, err := os.MkdirTemp("", "ie-invocation-test-*")
 	if err != nil {
@@ -26,19 +36,21 @@ func TestOverwriteStaleWorkingDirectoryState(t *testing.T) {
 	// Manually set the global (init would normally do this).
 	OriginalInvocationDirectory = tempDir
 
+	stateFile := filepath.Join(tempDir, "working-dir-state")
+
 	// Write a stale state file pointing somewhere else.
 	staleDir := filepath.Join(tempDir, "stale")
-	if err := os.WriteFile(lib.DefaultWorkingDirectoryStateFile, []byte(staleDir+"\n"), 0644); err != nil {
+	if err := os.WriteFile(stateFile, []byte(staleDir+"\n"), 0644); err != nil {
 		t.Fatalf("failed to write stale state file: %v", err)
 	}
 
 	// Execute the overwrite logic: mimic snippet from execute.go.
-	if err := lib.SaveWorkingDirectoryStateFile(lib.DefaultWorkingDirectoryStateFile, OriginalInvocationDirectory); err != nil {
+	if err := lib.SaveWorkingDirectoryStateFile(stateFile, OriginalInvocationDirectory); err != nil {
 		t.Fatalf("failed to save working directory state: %v", err)
 	}
 
 	// Read back the file and assert it matches the invocation directory.
-	contents, err := os.ReadFile(lib.DefaultWorkingDirectoryStateFile)
+	contents, err := os.ReadFile(stateFile)
 	if err != nil {
 		t.Fatalf("failed to read working directory state: %v", err)
 	}
