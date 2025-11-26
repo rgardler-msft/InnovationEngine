@@ -13,6 +13,8 @@ This step will show you how to do something.
 echo "Hello, world!"
 ```
 
+Expected output:
+
 <!-- expected_similarity=1.0 -->
 
 ```text

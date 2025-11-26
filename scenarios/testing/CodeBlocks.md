@@ -12,6 +12,8 @@ The simple case is some descriptive text before the code block, followed by the 
 echo "Hello, world!"
 ```
 
+Expected output:
+
 <!-- expected_similarity=1.0 -->
 
 ```text
@@ -28,6 +30,8 @@ This isn't currently tested by `ie test`, so we will need to run `ie interactive
 echo "Detailed descriptions are important."
 ```
 
+Expected output:
+
 <!-- expected_similarity=1.0 -->
 
 ```text
@@ -41,6 +45,8 @@ The sandwich case is like the simple case above, but there is more text after th
 ```bash
 echo "Can I have a sandwich please."
 ```
+
+Expected output:
 
 <!-- expected_similarity=1.0 -->
 

@@ -39,6 +39,8 @@ echo "Task finished!"
 
 ## Step 4: Multiple commands with delays
 
+This final block chains several phases to ensure streaming continues across sequential commands.
+
 ```bash
 echo "=== Phase 1 ==="
 sleep 1

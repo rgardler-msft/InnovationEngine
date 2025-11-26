@@ -15,6 +15,8 @@ This master test scenario runs all existing test documents in this folder as pre
 
 ## Validation
 
+This final check confirms that the aggregated scenarios completed successfully.
+
 ```bash
 # Final sanity check after all test scenarios have run.
 echo "Master test scenario completed."
