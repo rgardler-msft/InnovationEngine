@@ -8,6 +8,8 @@ references another prerequisite from within that section to validate execution o
 
 ### Seed Inline Log
 
+Bootstrap the log with the first stage marker.
+
 ```bash
 export INLINE_PREREQ_LOG="stage1"
 ```
@@ -17,6 +19,8 @@ export INLINE_PREREQ_LOG="stage1"
 The following nested heading ensures subsections are treated as part of the prerequisite.
 
 #### Append Stage Two
+
+Record the second stage so later checks can confirm sequencing.
 
 ```bash
 export INLINE_PREREQ_LOG="${INLINE_PREREQ_LOG}:stage2"
@@ -31,11 +35,15 @@ is discovered.
 
 ### Final Inline Stage
 
+Add the closing stage entry before leaving the prerequisite section.
+
 ```bash
 export INLINE_PREREQ_LOG="${INLINE_PREREQ_LOG}:stage3"
 ```
 
 ## Steps
+
+Emit a completion message to prove the inline prerequisite body executed.
 
 ```bash
 echo "Inline prerequisite body complete"
