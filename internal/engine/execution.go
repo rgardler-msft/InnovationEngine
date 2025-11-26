@@ -3,7 +3,6 @@ package engine
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -26,11 +25,6 @@ const (
 	// spinnerFrames  = `⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`
 	spinnerFrames  = `-\|/`
 	spinnerRefresh = 100 * time.Millisecond
-)
-
-var (
-	autoPrereqCommentPattern  = regexp.MustCompile(`^#\s*ie:auto-prereq-([a-z-]+)\s+(.*)$`)
-	autoPrereqMetadataPattern = regexp.MustCompile(`([a-zA-Z0-9_-]+)="([^"]*)"`)
 )
 
 // If a scenario has an `az group delete` command and the `--do-not-delete`
@@ -128,7 +122,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 		}
 
 		for _, block := range step.CodeBlocks {
-			blockType, autoMeta, hasAutoMeta := parseAutoPrereqMetadata(block.Content)
+			blockType, autoMeta, hasAutoMeta := common.ParseAutoPrereqMetadata(block.Content)
 			isBannerBlock := hasAutoMeta && blockType == "banner"
 			isVerificationBlock := hasAutoMeta && blockType == "verification"
 			isBodyBlock := hasAutoMeta && blockType == "body"
@@ -160,7 +154,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 
 			commandContent := block.Content
 			if hasAutoMeta {
-				commandContent = stripAutoPrereqComment(commandContent)
+				commandContent = common.StripAutoPrereqComment(commandContent)
 			}
 
 			// If this is a body block and the marker file exists (verification passed), skip rendering & execution entirely.
@@ -202,7 +196,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 
 			// Remove any existing marker before starting verification blocks to ensure fresh evaluation.
 			if isVerificationBlock && markerValue != "" {
-				_ = os.Remove(markerValue)
+				_ = common.RemovePrereqMarker(markerValue)
 			}
 
 			// Render any descriptive markdown paragraphs that appeared immediately
@@ -400,7 +394,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 
 							// For a successful verification, create marker immediately (static banner will reflect outcome).
 							if isVerificationBlock && markerValue != "" {
-								if err := writePrereqMarker(markerValue, autoMeta["display"]); err != nil {
+								if err := common.WritePrereqMarker(markerValue, autoMeta["display"]); err != nil {
 									logging.GlobalLogger.Warnf("Failed to write marker %s: %v", markerValue, err)
 								}
 							}
@@ -554,42 +548,6 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 	return nil
 }
 
-func parseAutoPrereqMetadata(content string) (string, map[string]string, bool) {
-	lines := strings.Split(content, "\n")
-	if len(lines) == 0 {
-		return "", nil, false
-	}
-
-	firstLine := strings.TrimSpace(lines[0])
-	matches := autoPrereqCommentPattern.FindStringSubmatch(firstLine)
-	if len(matches) != 3 {
-		return "", nil, false
-	}
-
-	metadata := make(map[string]string)
-	for _, match := range autoPrereqMetadataPattern.FindAllStringSubmatch(matches[2], -1) {
-		if len(match) != 3 {
-			continue
-		}
-		metadata[match[1]] = match[2]
-	}
-
-	return matches[1], metadata, true
-}
-
-func stripAutoPrereqComment(content string) string {
-	if _, _, hasMetadata := parseAutoPrereqMetadata(content); !hasMetadata {
-		return content
-	}
-
-	parts := strings.SplitN(content, "\n", 2)
-	if len(parts) < 2 {
-		return ""
-	}
-
-	return parts[1]
-}
-
 func stripPrereqBodyWrapper(content string) string {
 	trimmedContent := strings.TrimSuffix(content, "\n")
 	lines := strings.Split(trimmedContent, "\n")
@@ -667,19 +625,4 @@ func formatSimilarityValue(value float64) string {
 		return fmt.Sprintf("%.1f", value)
 	}
 	return formatted
-}
-
-func writePrereqMarker(markerPath, display string) error {
-	if strings.TrimSpace(markerPath) == "" {
-		return nil
-	}
-
-	dir := filepath.Dir(markerPath)
-	if dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return err
-		}
-	}
-
-	return os.WriteFile(markerPath, []byte(display), 0o600)
 }

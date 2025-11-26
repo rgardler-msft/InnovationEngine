@@ -38,9 +38,24 @@ func Exit(encounteredFailure bool) tea.Cmd {
 // Executes a bash command and returns a tea message with the output. This function
 // will be executed asycnhronously.
 func ExecuteCodeBlockAsync(codeBlock parsers.CodeBlock, env map[string]string) tea.Cmd {
+	blockType, autoMeta, hasAutoMeta := ParseAutoPrereqMetadata(codeBlock.Content)
+	isVerificationBlock := hasAutoMeta && blockType == "verification"
+	markerValue := ""
+	display := ""
+	if hasAutoMeta {
+		markerValue = autoMeta["marker"]
+		display = autoMeta["display"]
+	}
+
 	return func() tea.Msg {
 		logging.GlobalLogger.Infof(
 			"Executing command asynchronously:\n %s", codeBlock.Content)
+
+		if isVerificationBlock && markerValue != "" {
+			if err := RemovePrereqMarker(markerValue); err != nil {
+				logging.GlobalLogger.Warnf("Failed to clear verification marker %s: %v", markerValue, err)
+			}
+		}
 
 		output, err := shells.ExecuteBashCommand(codeBlock.Content, shells.BashCommandConfiguration{
 			EnvironmentVariables: env,
@@ -49,6 +64,15 @@ func ExecuteCodeBlockAsync(codeBlock parsers.CodeBlock, env map[string]string) t
 			WriteToHistory:       true,
 		})
 		if err != nil {
+			if isVerificationBlock {
+				logging.GlobalLogger.Warnf("Verification command failed for %s: %v", display, err)
+				return SuccessfulCommandMessage{
+					StdOut:          output.StdOut,
+					StdErr:          output.StdErr,
+					SimilarityScore: 0,
+				}
+			}
+
 			logging.GlobalLogger.Errorf("Error executing command:\n %s", err.Error())
 			return FailedCommandMessage{
 				StdOut:          output.StdOut,
@@ -74,6 +98,15 @@ func ExecuteCodeBlockAsync(codeBlock parsers.CodeBlock, env map[string]string) t
 		)
 
 		if outputComparisonError != nil {
+			if isVerificationBlock {
+				logging.GlobalLogger.Warnf("Verification output mismatch for %s: %v", display, outputComparisonError)
+				return SuccessfulCommandMessage{
+					StdOut:          output.StdOut,
+					StdErr:          output.StdErr,
+					SimilarityScore: score,
+				}
+			}
+
 			logging.GlobalLogger.Errorf(
 				"Error comparing command outputs: %s",
 				outputComparisonError.Error(),
@@ -86,6 +119,12 @@ func ExecuteCodeBlockAsync(codeBlock parsers.CodeBlock, env map[string]string) t
 				SimilarityScore: score,
 			}
 
+		}
+
+		if isVerificationBlock && markerValue != "" {
+			if err := WritePrereqMarker(markerValue, display); err != nil {
+				logging.GlobalLogger.Warnf("Failed to write verification marker %s: %v", markerValue, err)
+			}
 		}
 
 		logging.GlobalLogger.Infof("Command output to stdout:\n %s", output.StdOut)
