@@ -16,3 +16,4 @@ examples/awesome-aks
 
 # ignore initialization files
 .openai
+ie.log*
