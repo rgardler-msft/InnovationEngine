@@ -43,6 +43,17 @@ func formatValidationDetails(messages []string) string {
 	return strings.TrimSpace(builder.String())
 }
 
+func formatWarningSummary(count int) string {
+	return fmt.Sprintf("Warning: validation warnings detected (%d); see details below.", count)
+}
+
+func pluralSuffix(count int) string {
+	if count == 1 {
+		return ""
+	}
+	return "s"
+}
+
 var inspectCommand = &cobra.Command{
 	Use:   "inspect [markdown file]",
 	Args:  cobra.MinimumNArgs(1),
@@ -74,11 +85,26 @@ var inspectCommand = &cobra.Command{
 		warnings, errors := partitionValidationIssues(issues)
 		writer := cmd.ErrOrStderr()
 		if len(errors) > 0 {
-			errText := ui.ErrorStyle.Render(formatValidationDetails(errors))
-			return commandError(cmd, fmt.Errorf("%s", errText), false, "document failed inspection checks")
+			if len(warnings) > 0 {
+				fmt.Fprintln(writer, ui.WarningStyle.Render(formatWarningSummary(len(warnings))))
+				for _, warning := range warnings {
+					fmt.Fprintln(writer, ui.WarningStyle.Render(fmt.Sprintf("- %s", warning)))
+				}
+			}
+			summary := fmt.Sprintf("document failed inspection checks (%d validation error%s)", len(errors), pluralSuffix(len(errors)))
+			details := formatValidationDetails(errors)
+			var errPayload string
+			if details != "" {
+				errPayload = ui.ErrorStyle.Render(details)
+			}
+			errResult := commandError(cmd, fmt.Errorf("%s", errPayload), false, summary)
+			fmt.Fprintln(writer, "")
+			fmt.Fprintln(writer, summary)
+			return errResult
 		}
 		if len(warnings) > 0 {
-			fmt.Fprintln(writer, ui.WarningStyle.Render("Warning: validation warnings detected; see details below."))
+			summary := formatWarningSummary(len(warnings))
+			fmt.Fprintln(writer, ui.WarningStyle.Render(summary))
 		}
 
 		fmt.Println(ui.ScenarioTitleStyle.Render(scenario.Name))
