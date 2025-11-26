@@ -42,6 +42,18 @@ Treat these as executable acceptance criteria when contributing new engine featu
 Looking for domain-specific samples? Explore the curated scenario directories under `../examples/` (AKS, authentication, VM operations, and more). Each folder pairs narrative Markdown with runnable commands tailored to that workload.
 
 If you build a new scenario, add it alongside the closest domain example and reference it from this guide so future authors can discover it quickly.
+
+## Example Author → Production Flow
+The sequence below shows how executable docs typically move from a draft to running in production environments. Use the IE CLI where noted and your normal repo tooling for the rest.
+
+1. **Author** – Write or update the Markdown scenario and run `ie inspect my-doc.md` to confirm the structure, prerequisite annotations, and descriptions look right before executing anything destructive. See [Authoring-With-Copilot.md](Authoring-With-Copilot.md) for deeper guidance on structuring content and leveraging assistants during this phase.
+2. **Test** – Validate all `expected_results` blocks locally with `ie test my-doc.md`. This executes each code block in a sandbox, comparing actual output to the embedded expectations so you can tighten similarity thresholds early; refer to [specs/test-reporting.md](specs/test-reporting.md) for expectations, similarity scoring, and troubleshooting tips.
+3. **Publish** – Commit the validated doc alongside any prerequisite files and open a PR. Augment your repo by wiring a GitHub Action (or equivalent CI job) that runs `ie test` against the PR to block regressions before review completes—see the CI recommendations in [Executable-Doc-Quickstart.md#next-steps](Executable-Doc-Quickstart.md#next-steps).
+4. **Execute** – After merge, run the scenario with `ie execute my-doc.md` to provision resources in the target subscription or cluster. Provide per-run values with repeated `--var NAME=value` flags whenever the scenario exposes inputs; [modesOfOperation.md](modesOfOperation.md) covers execute semantics versus other modes.
+5. **Env-capture** – Export the resulting configuration into a reusable script: `ie env-config > ie-env.sh`. Consumers can `source ie-env.sh` to hydrate their shells, and you can optionally add `--prefix` if you only want a subset of variables—see [environmentVariables.md](environmentVariables.md) for naming patterns and additional tooling.
+6. **Test (post-deploy)** – Use your team’s established QA/validation processes to exercise the freshly provisioned environment (integration tests, smoke tests, monitoring checkpoints, etc.). The goal is to verify the workload itself, so lean on your existing QA runbooks even though there is no IE-specific document for this stage yet.
+7. **Export script** – Create a fully standalone shell script with `ie to-bash my-doc.md > deploy.sh` so automation systems without the IE runtime can execute the scenario; consult [modesOfOperation.md#to-bash-mode](modesOfOperation.md#to-bash-mode) for details. In most cases you will pair this script with the captured `ie-env.sh` file so both the actions and their parameters travel together.
+8. **Production** – Feed `deploy.sh` (plus the env file) into your production release pipeline or change-management tooling, following the CI/CD integration advice in [Executable-Doc-Quickstart.md#next-steps](Executable-Doc-Quickstart.md#next-steps). The pipeline becomes responsible for scheduling, approvals, and auditing while the generated artifacts keep the actual deployment steps deterministic.
   2. 
 
   3. [Build a Hello World script](tutorial/README.md)

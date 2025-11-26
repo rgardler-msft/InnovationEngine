@@ -61,3 +61,16 @@ echo $PATH
 ```text
 /home/username/.local/bin...
 ```
+
+## Exporting Captured Environment Variables
+
+IE persists every command's environment in `/tmp/env-vars`. After a deployment
+you can convert that file into a source-able script with the new CLI command:
+
+```bash
+ie env-config > ie-env.sh
+source ie-env.sh
+```
+
+Use `--prefix` to restrict the output to a specific family of variables or
+`--state-file` if you stored the state elsewhere.

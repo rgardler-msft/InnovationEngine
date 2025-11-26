@@ -120,6 +120,13 @@ func filterInvalidKeys(envMap map[string]string) map[string]string {
 	return validEnvMap
 }
 
+// SanitizeEnvironmentMap removes any keys that are not valid shell environment
+// variable names. Callers that surface persisted environment data should run it
+// before emitting shell-friendly output.
+func SanitizeEnvironmentMap(envMap map[string]string) map[string]string {
+	return filterInvalidKeys(envMap)
+}
+
 // Deletes the stored environment variables file.
 func DeleteEnvironmentStateFile(path string) error {
 	return os.Remove(path)

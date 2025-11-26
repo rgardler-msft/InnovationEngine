@@ -196,6 +196,39 @@ func TestClearEnvCommand_ForceNoFiles(t *testing.T) {
 	}
 }
 
+func TestEnvConfigCommand_PrintsExports(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "env-vars")
+	data := "EV_ALPHA=\"one\"\nEV_BETA=\"two words\"\n"
+	if err := os.WriteFile(stateFile, []byte(data), 0600); err != nil {
+		t.Fatalf("failed to seed env file: %v", err)
+	}
+
+	stdout, _, err := runRootWithArgsCapturing(t, "env-config", "--state-file", stateFile)
+	if err != nil {
+		t.Fatalf("env-config should succeed, got %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "export EV_ALPHA=\"one\"") {
+		t.Fatalf("expected EV_ALPHA export, got %q", output)
+	}
+	alphaIdx := strings.Index(output, "export EV_ALPHA")
+	betaIdx := strings.Index(output, "export EV_BETA")
+	if alphaIdx == -1 || betaIdx == -1 {
+		t.Fatalf("expected both exports in output: %q", output)
+	}
+	if !(alphaIdx < betaIdx) {
+		t.Fatalf("expected alphabetical ordering, got %q", output)
+	}
+}
+
+func TestEnvConfigCommand_MissingFileErrors(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "does-not-exist")
+	if _, _, err := runRootWithArgsCapturing(t, "env-config", "--state-file", missing); err == nil {
+		t.Fatalf("expected error when env state file is missing")
+	}
+}
+
 func TestRootCommandRejectsInvalidEnvironment(t *testing.T) {
 	err := runRootWithArgs(t, "clear-env", "--force", "--environment", "invalid-env")
 	if err == nil {
