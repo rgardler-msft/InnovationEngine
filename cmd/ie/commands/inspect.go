@@ -2,7 +2,10 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/Azure/InnovationEngine/internal/engine/common"
+	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/Azure/InnovationEngine/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -15,6 +18,31 @@ func init() {
 	addCorrelationFlag(inspectCommand)
 }
 
+func partitionValidationIssues(issues []common.ValidationIssue) (warnings []string, errors []string) {
+	for _, issue := range issues {
+		switch issue.Severity {
+		case common.ValidationSeverityWarning:
+			warnings = append(warnings, issue.Message)
+		case common.ValidationSeverityError:
+			errors = append(errors, issue.Message)
+		}
+	}
+	return warnings, errors
+}
+
+func formatValidationDetails(messages []string) string {
+	if len(messages) == 0 {
+		return ""
+	}
+	var builder strings.Builder
+	for _, message := range messages {
+		builder.WriteString("- ")
+		builder.WriteString(message)
+		builder.WriteString("\n")
+	}
+	return strings.TrimSpace(builder.String())
+}
+
 var inspectCommand = &cobra.Command{
 	Use:   "inspect [markdown file]",
 	Args:  cobra.MinimumNArgs(1),
@@ -25,9 +53,32 @@ var inspectCommand = &cobra.Command{
 			return handleExecutionOptionError(cmd, err)
 		}
 
+		stopCapture := logging.StartWarningCapture()
 		scenario, err := createScenarioFromOptions(opts, inspectRunnerTypes)
+		capturedWarnings := stopCapture()
 		if err != nil {
+			writer := cmd.ErrOrStderr()
+			for _, warning := range capturedWarnings {
+				fmt.Fprintln(writer, ui.WarningStyle.Render(warning))
+			}
 			return commandError(cmd, err, false, "error creating scenario")
+		}
+
+		issues := common.ValidateScenarioForInspect(scenario)
+		for _, warning := range capturedWarnings {
+			issues = append(issues, common.ValidationIssue{Severity: common.ValidationSeverityWarning, Message: warning})
+		}
+		for _, msg := range common.DrainMissingPrerequisites() {
+			issues = append(issues, common.ValidationIssue{Severity: common.ValidationSeverityError, Message: msg})
+		}
+		warnings, errors := partitionValidationIssues(issues)
+		writer := cmd.ErrOrStderr()
+		if len(errors) > 0 {
+			errText := ui.ErrorStyle.Render(formatValidationDetails(errors))
+			return commandError(cmd, fmt.Errorf("%s", errText), false, "document failed inspection checks")
+		}
+		if len(warnings) > 0 {
+			fmt.Fprintln(writer, ui.WarningStyle.Render("Warning: validation warnings detected; see details below."))
 		}
 
 		fmt.Println(ui.ScenarioTitleStyle.Render(scenario.Name))
@@ -56,6 +107,14 @@ var inspectCommand = &cobra.Command{
 						6),
 				)
 				fmt.Println()
+			}
+		}
+
+		if len(warnings) > 0 {
+			fmt.Fprintln(writer, "")
+			fmt.Fprintln(writer, ui.WarningStyle.Render("Validation warning details:"))
+			for _, warning := range warnings {
+				fmt.Fprintln(writer, ui.WarningStyle.Render(fmt.Sprintf("- %s", warning)))
 			}
 		}
 
