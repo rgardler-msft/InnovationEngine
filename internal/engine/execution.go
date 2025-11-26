@@ -116,6 +116,18 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 		fmt.Println(ui.StepTitleStyle.Render(stepTitle))
 		azureStatus.CurrentStep = stepNumber + 1
 
+		var prereqDocSeq int
+		var prereqDocOrder map[string]*struct {
+			index    int
+			sections int
+		}
+		if step.Name == "Prerequisites" {
+			prereqDocOrder = make(map[string]*struct {
+				index    int
+				sections int
+			})
+		}
+
 		for _, block := range step.CodeBlocks {
 			blockType, autoMeta, hasAutoMeta := parseAutoPrereqMetadata(block.Content)
 			isBannerBlock := hasAutoMeta && blockType == "banner"
@@ -125,6 +137,22 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 			markerValue := ""
 			if hasAutoMeta {
 				markerValue = autoMeta["marker"]
+			}
+
+			var prereqDocState *struct {
+				index    int
+				sections int
+			}
+			if prereqDocOrder != nil && hasAutoMeta && markerValue != "" {
+				prereqDocState = prereqDocOrder[markerValue]
+				if prereqDocState == nil {
+					prereqDocSeq++
+					prereqDocState = &struct {
+						index    int
+						sections int
+					}{index: prereqDocSeq}
+					prereqDocOrder[markerValue] = prereqDocState
+				}
 			}
 
 			if isVerificationBlock && markerValue != "" && failedVerificationMarkers[markerValue] {
@@ -142,6 +170,20 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 					// Body is skipped; continue to next block without any output.
 					continue
 				}
+			}
+
+			if prereqDocState != nil && (isVerificationBlock || isBodyBlock) {
+				prereqDocState.sections++
+				label := fmt.Sprintf("%d.%d.%d", stepNumber+1, prereqDocState.index, prereqDocState.sections)
+				sectionLabel := "Verification"
+				if isBodyBlock {
+					sectionLabel = "Execution"
+				}
+				display := autoMeta["display"]
+				if strings.TrimSpace(display) == "" {
+					display = block.Header
+				}
+				fmt.Printf("    %s %s – %s\n\n", label, sectionLabel, display)
 			}
 
 			displayContent := commandContent
@@ -185,6 +227,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 				fmt.Println()
 			}
 
+			suppressOutput := isBannerBlock
 			var finalCommandOutput string
 			if e.Configuration.RenderValues {
 				// Render the codeblock.
@@ -250,7 +293,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 
 				// When streaming output, we skip spinner rendering since output
 				// will appear in real-time
-				streamOutput := e.Configuration.StreamOutput
+				streamOutput := e.Configuration.StreamOutput && !suppressOutput
 
 				if !streamOutput {
 					terminal.MoveCursorPositionUp(lines)
@@ -350,7 +393,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 								terminal.MoveCursorPositionDown(lines)
 							}
 
-							if strings.TrimSpace(commandOutput.StdOut) != "" && !streamOutput {
+							if strings.TrimSpace(commandOutput.StdOut) != "" && !streamOutput && !suppressOutput {
 								fmt.Printf("%s\n", ui.RemoveHorizontalAlign(ui.VerboseStyle.Render(commandOutput.StdOut)))
 							}
 
@@ -446,7 +489,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 					fmt.Printf("\r    \n")
 					terminal.MoveCursorPositionDown(lines)
 
-					if strings.TrimSpace(output.StdOut) != "" {
+					if strings.TrimSpace(output.StdOut) != "" && !suppressOutput {
 						fmt.Printf("  %s\n", ui.VerboseStyle.Render(output.StdOut))
 					}
 
