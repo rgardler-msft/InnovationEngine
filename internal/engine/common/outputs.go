@@ -26,8 +26,10 @@ func CompareCommandOutputs(
 		if !expectedRegex.MatchString(actualNormalized) {
 			return 0.0, fmt.Errorf(
 				ui.ErrorMessageStyle.Render(
-					fmt.Sprintf("Expected output does not match: %q.", expectedRegex),
+					"Expected output does not match actual output.\nExpected Pattern:\n%s\nActual:\n%s",
 				),
+				ui.VerboseStyle.Render(expectedRegex.String()),
+				ui.VerboseStyle.Render(summarizeOutput(actualNormalized, 20)),
 			)
 		}
 
@@ -54,10 +56,10 @@ func CompareCommandOutputs(
 		if !results.AboveThreshold {
 			return results.Score, fmt.Errorf(
 				ui.ErrorMessageStyle.Render(
-					"Expected output does not match actual output.\nGot:\n%s\nExpected:\n%s\nExpected Score:%s\nActual Score:%s",
+					"Expected output does not match actual output.\nExpected:\n%s\nActual:\n%s\nExpected Score:%s\nActual Score:%s",
 				),
-				ui.VerboseStyle.Render(actualNormalized),
-				ui.VerboseStyle.Render(expectedNormalized),
+				ui.VerboseStyle.Render(summarizeOutput(expectedNormalized, 20)),
+				ui.VerboseStyle.Render(summarizeOutput(actualNormalized, 20)),
 				ui.VerboseStyle.Render(fmt.Sprintf("%f", expectedSimilarity)),
 				ui.VerboseStyle.Render(fmt.Sprintf("%f", results.Score)),
 			)
@@ -72,10 +74,10 @@ func CompareCommandOutputs(
 	if expectedSimilarity > score {
 		return score, fmt.Errorf(
 			ui.ErrorMessageStyle.Render(
-				"Expected output does not match actual output.\nGot:\n%s\nExpected:\n%s\nExpected Score:%s\nActual Score:%s",
+				"Expected output does not match actual output.\nExpected:\n%s\nActual:\n%s\nExpected Score:%s\nActual Score:%s",
 			),
-			ui.VerboseStyle.Render(actualNormalized),
-			ui.VerboseStyle.Render(expectedNormalized),
+			ui.VerboseStyle.Render(summarizeOutput(expectedNormalized, 20)),
+			ui.VerboseStyle.Render(summarizeOutput(actualNormalized, 20)),
 			ui.VerboseStyle.Render(fmt.Sprintf("%f", expectedSimilarity)),
 			ui.VerboseStyle.Render(fmt.Sprintf("%f", score)),
 		)
@@ -92,4 +94,20 @@ func normalizeOutput(value string) string {
 	// Then normalize line endings
 	value = strings.ReplaceAll(value, "\r\n", "\n")
 	return strings.ReplaceAll(value, "\r", "\n")
+}
+
+func summarizeOutput(value string, maxLines int) string {
+	trimmed := strings.TrimRight(value, "\n")
+	if trimmed == "" {
+		return "<empty>"
+	}
+
+	lines := strings.Split(trimmed, "\n")
+	if len(lines) <= maxLines {
+		return strings.Join(lines, "\n")
+	}
+
+	summary := append([]string{}, lines[:maxLines]...)
+	summary = append(summary, fmt.Sprintf("... (%d more lines)", len(lines)-maxLines))
+	return strings.Join(summary, "\n")
 }

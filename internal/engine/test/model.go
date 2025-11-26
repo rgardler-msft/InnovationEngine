@@ -195,10 +195,7 @@ func (model TestModeModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		codeBlockState.SimilarityScore = message.SimilarityScore
 
 		model.codeBlockState[step] = codeBlockState
-		model.CommandLines = append(
-			model.CommandLines,
-			ui.ErrorStyle.Render(codeBlockState.StdErr+message.Error.Error()),
-		)
+		model.CommandLines = append(model.CommandLines, renderFailureOutput(codeBlockState.StdErr, message.Error))
 		viewportContentUpdated = true
 
 		commands = append(commands, common.Exit(true))
@@ -330,4 +327,15 @@ func NewTestModeModel(
 		ready:                false,
 		CommandLines:         commandLines,
 	}, nil
+}
+
+func renderFailureOutput(stdErr string, err error) string {
+	var lines []string
+	if trimmed := strings.TrimSpace(stdErr); trimmed != "" {
+		lines = append(lines, trimmed)
+	}
+	if len(lines) == 0 {
+		return ui.ErrorStyle.Render("Command failed; see summary below.")
+	}
+	return ui.ErrorStyle.Render(strings.Join(lines, "\n"))
 }

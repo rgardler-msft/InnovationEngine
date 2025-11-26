@@ -3,6 +3,9 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
@@ -14,16 +17,19 @@ func commandError(cmd *cobra.Command, err error, showHelp bool, format string, a
 	if cmd != nil {
 		// Silence Cobra's automatic usage printing; we handle help output explicitly.
 		cmd.SilenceUsage = true
+		cmd.SilenceErrors = true
 	}
 	message := fmt.Sprintf(format, args...)
+	writer := errorWriter(cmd)
 
 	if err != nil {
 		logging.GlobalLogger.Errorf("%s: %v", message, err)
-		cmd.PrintErrf("Error: %s: %v\n", message, err)
+		fmt.Fprintf(writer, "Error: %s\n", message)
+		printErrorDetails(writer, err)
 		err = fmt.Errorf("%s: %w", message, err)
 	} else {
 		logging.GlobalLogger.Error(message)
-		cmd.PrintErrf("Error: %s\n", message)
+		fmt.Fprintf(writer, "Error: %s\n", message)
 		err = errors.New(message)
 	}
 
@@ -33,4 +39,30 @@ func commandError(cmd *cobra.Command, err error, showHelp bool, format string, a
 	}
 
 	return err
+}
+
+func printErrorDetails(writer io.Writer, err error) {
+	if err == nil {
+		return
+	}
+
+	trimmed := strings.TrimSpace(err.Error())
+	if trimmed == "" {
+		return
+	}
+
+	for _, line := range strings.Split(trimmed, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fmt.Fprintf(writer, "  %s\n", line)
+	}
+}
+
+func errorWriter(cmd *cobra.Command) io.Writer {
+	if cmd != nil {
+		return cmd.ErrOrStderr()
+	}
+	return os.Stderr
 }

@@ -73,7 +73,6 @@ func ExecuteCLI() {
 		)
 
 	if err := rootCommand.Execute(); err != nil {
-		fmt.Println(err)
 		logging.GlobalLogger.Errorf("Failed to execute ie: %s", err)
 		os.Exit(1)
 	}
