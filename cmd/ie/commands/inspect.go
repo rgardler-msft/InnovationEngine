@@ -57,7 +57,8 @@ func pluralSuffix(count int) string {
 var inspectCommand = &cobra.Command{
 	Use:   "inspect [markdown file]",
 	Args:  cobra.MinimumNArgs(1),
-	Short: "Execute a document in inspect mode.",
+	Short: "Lint an executable document without running code blocks.",
+	Long:  `inspect performs structural linting against a document before you run it. The command validates language tags, prerequisite expected_results blocks (with exceptions for export-only code), environment variable prefixes, and usage (unused exports become warnings, undefined uppercase variables become errors). It never executes the fenced code blocks—use inspect as a safe preflight step before interactive, execute, or test modes.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts, err := bindExecutionOptions(cmd, args)
 		if err != nil {

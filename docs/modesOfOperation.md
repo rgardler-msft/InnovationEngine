@@ -6,7 +6,7 @@ Innovation Engine provides a number of modes of operation. You can view a summar
   * `interactive` - Execute a document in interactive mode - ideal for learning.
   * `test` - Execute the commands in a document and test output against the expected. Abort if a test fails. 
   * `to-bash` - Convert the commands in a document into a bash script for standalone execution.
-  * `inspect` - Deprecated
+  * `inspect` - Run structural linting and safety checks before executing anything.
   
 ## Interactive Mode
 
@@ -28,7 +28,16 @@ Test mode runs the commands and then verifies that the output is sufficiently si
 
 ## Inspect mode
 
-This mode is deprecated and should not be used.
+`inspect` is the guardrail pass you run before executing a scenario in earnest. It parses the entire Markdown file (including prerequisites) and surfaces actionable validation findings without issuing any of the code blocks. Typical problems caught here include:
+
+- Missing descriptive text or language tags on fenced code blocks.
+- Prerequisite commands that skip `expected_results` verification (unless the block only contains `export` statements).
+- Environment variable issues: lowercase locals are allowed, but uppercase names must either be exported or assigned before use. Unused exports show up as warnings; references to undefined uppercase variables are errors.
+- Prefix hygiene: exports must begin with an uppercase prefix (e.g., `PREFIX_VALUE`). `HASH` is the only built-in exception because it is generated automatically for timestamp-safe names.
+
+When `inspect` finds issues it prints both warnings and errors, grouped with counts (for example, `Warning: validation warnings detected (2); see details below.`). If errors exist, the command exits non-zero after reprinting the error summary so CI logs remain readable. Warnings never block execution, but fix them early to keep documents maintainable.
+
+Because `inspect` never runs the commands it is safe to use as a continuous lint pass in your authoring workflow (`ie inspect scenario.md`). Pair it with `ie test` once the structural linting comes back clean.
 
 # Next Steps
 
