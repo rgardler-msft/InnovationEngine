@@ -1,20 +1,24 @@
 # Overview
 
-Innovation Engine is a tool for rapid innovation and simplification. Innovation Engine is 
-a CLI tool known as ie that enables execution and testing of Executable Documentation.
+Innovation Engine is a CLI (`ie`) that turns Markdown into executable, testable documentation. Every fenced shell block doubles as runnable code, so tutorials, demos, validations, and runbooks stay in sync with the narrative that describes them.
 
-Executable Documentation is a shell script, leveraging any tools available in the shell and embedding it within documentation. That is, it takes standard markdown language and amplifies it by allowing the code commands within the document to be executed interacted with an executed.
-This means that for the first time documentation is also code. 
+Executable Documentation wraps ordinary Markdown around shell scripts, leveraging whatever tooling is already available in the execution environment. Instead of copying commands into separate scripts, you elevate the documentation itself to be the source of truth.
 
-Using Innovation Engine you can:
+## Key Capabilities
 
-  * Describe the intent and expected behaviour of your shell scripts in markdown rather than comments. This means you documentation can contain hyperlinks, images, formatting etc. It can be rendered as standard markdown, e.g. as a `README.md` or a wiki page in GitHub, or as a web page. It also means that there is no need to keep two separate documents in sync. Editing code and documentation is now done in a single file.
-  * Execute the code within your documentation just like any other shell script. The Innovation Engine CLI tool will parse out your script and execute it for you, as if it were a standard shell script.
-  * Execute in "learn mode" onboarding new team members can be hard. Telling them to learn from a script is often going too deep too quickly, while starting from documentation presents the challenge of finding the right starting point for all skill levels. Innovation Engine allows individuals to work through the documented script at their own pace. Telling the engine to execute up to the point that they can follow and then working through step by step guided by the documentation.
-  * Test the intended results of a script through the inclusion of self-documenting results blocks. This allows you to test your documentation/scripts in the CLI before merging, or in your CI/CD environment using, for example, GitHub Actions.
-  * Extract the executable script from the documentation for use without Innovation Engine in the workflow.
+  * **Document once, reuse everywhere.** Express intent, context, and commands in the same file—render it as Markdown, run it via `ie`, or publish it to a wiki without duplicating content.
+  * **Execute safely in multiple modes.** Run documents interactively, as unattended scripts, or as tests that halt on validation failures.
+  * **Onboard with "learn mode."** Pause at each heading or code block, review the narrative, and resume execution at your own pace.
+  * **Continuously validate results.** Embed expected output blocks (exact match, fuzzy similarity, or regex) so CI pipelines can assert documentation accuracy automatically.
+  * **Extract portable scripts.** Pull a pure shell script from any executable document when you need to embed the logic somewhere else.
 
-Innovation Engine is designed to be reused in custom user experiences. For example, Microsoft Azure uses Innovation Engine to provide documentation on their Learn site, which can also be executed in the Azure Portal. This allows users to explore "good practice" documentation at the pace they prefer. They can simply read the documentation, they can interactively work through it in a customer Portal interface or they can simply go ahead and run it in order to deploy the architecture described within the document.
+Innovation Engine also powers richer host experiences. For example, Microsoft Azure Learn content and Azure Portal walkthroughs can run the exact same executable document—read-only in the browser, interactive in the portal, or automated in CI/CD.
+
+## Documentation Map
+
+- Start with `docs/README.md` for a curated index of tutorials, reference guides, and specs.
+- Walk through `docs/helloWorldDemo.md` to see executable documentation concepts end-to-end.
+- Use `docs/Executable-Doc-Quickstart.md` as a ready-to-run, timestamp-safe template for new scenarios.
 
 ## Install Innovation Engine CLI
 
