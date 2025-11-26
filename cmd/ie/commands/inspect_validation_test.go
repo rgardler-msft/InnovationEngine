@@ -128,3 +128,17 @@ func TestInspectAllowsLowercaseLocalVariables(t *testing.T) {
 		t.Fatalf("expected inspect to allow lowercase local variables, got %v", err)
 	}
 }
+
+func TestInspectReportsSuccessMessageWhenNoFindings(t *testing.T) {
+	content := "# Scenario\n\n## Step\n\nSay hello.\n\n```bash\necho hello\n```\n"
+	stdout, stderr, err := runRootWithArgsCapturing(t, "inspect", writeScenarioWithContent(t, content))
+	if err != nil {
+		t.Fatalf("expected inspect to succeed for clean scenario, got %v", err)
+	}
+	if strings.Contains(stdout.String(), "Scenario") {
+		t.Fatalf("did not expect scenario outline when not verbose, got %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "Inspection passed: no validation issues found.") {
+		t.Fatalf("expected success message, got stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+}

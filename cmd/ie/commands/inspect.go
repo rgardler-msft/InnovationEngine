@@ -106,42 +106,41 @@ var inspectCommand = &cobra.Command{
 		if len(warnings) > 0 {
 			summary := formatWarningSummary(len(warnings))
 			fmt.Fprintln(writer, ui.WarningStyle.Render(summary))
-		}
-
-		fmt.Println(ui.ScenarioTitleStyle.Render(scenario.Name))
-		for stepNumber, step := range scenario.Steps {
-			stepTitle := fmt.Sprintf("  %d. %s\n", stepNumber+1, step.Name)
-			fmt.Println(ui.StepTitleStyle.Render(stepTitle))
-			for codeBlockNumber, codeBlock := range step.CodeBlocks {
-				fmt.Println(
-					ui.InteractiveModeCodeBlockDescriptionStyle.Render(
-						fmt.Sprintf(
-							"    %d.%d %s",
-							stepNumber+1,
-							codeBlockNumber+1,
-							codeBlock.Description,
-						),
-					),
-				)
-				fmt.Print(
-					ui.IndentMultiLineCommand(
-						fmt.Sprintf(
-							"      %s",
-							ui.InteractiveModeCodeBlockStyle.Render(
-								codeBlock.Content,
-							),
-						),
-						6),
-				)
-				fmt.Println()
-			}
-		}
-
-		if len(warnings) > 0 {
-			fmt.Fprintln(writer, "")
-			fmt.Fprintln(writer, ui.WarningStyle.Render("Validation warning details:"))
 			for _, warning := range warnings {
 				fmt.Fprintln(writer, ui.WarningStyle.Render(fmt.Sprintf("- %s", warning)))
+			}
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), "Inspection passed: no validation issues found.")
+		}
+
+		if opts.Verbose {
+			fmt.Println(ui.ScenarioTitleStyle.Render(scenario.Name))
+			for stepNumber, step := range scenario.Steps {
+				stepTitle := fmt.Sprintf("  %d. %s\n", stepNumber+1, step.Name)
+				fmt.Println(ui.StepTitleStyle.Render(stepTitle))
+				for codeBlockNumber, codeBlock := range step.CodeBlocks {
+					fmt.Println(
+						ui.InteractiveModeCodeBlockDescriptionStyle.Render(
+							fmt.Sprintf(
+								"    %d.%d %s",
+								stepNumber+1,
+								codeBlockNumber+1,
+								codeBlock.Description,
+							),
+						),
+					)
+					fmt.Print(
+						ui.IndentMultiLineCommand(
+							fmt.Sprintf(
+								"      %s",
+								ui.InteractiveModeCodeBlockStyle.Render(
+									codeBlock.Content,
+								),
+							),
+							6),
+					)
+					fmt.Println()
+				}
 			}
 		}
 
