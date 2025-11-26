@@ -10,6 +10,7 @@ The following prerequisite documents will be executed before validation. One exi
 - [A prereuisite that does not need to run](prereq/prereq-skip-with-verification.md)
 - [A nested prerequisite chain](prereq/prereq-nested-level1.md)
 - [A prerequisite that is missing](prereq/missing-prereq.md)
+- [A prerequisite with inline content](prereq/prereq-inline-section.md)
 
 ## Validate Prerequisites Ran
 
@@ -43,14 +44,30 @@ else
     echo "FAILURE: Nested level 2 prerequisite did not run"
     exit 1
 fi
+
+if [ "$INLINE_PREREQ_LOG" = "stage1:stage2:stage3" ]; then
+    echo "Inline prerequisite section commands executed"
+else
+    echo "FAILURE: Inline prerequisite section did not execute in order"
+    exit 1
+fi
+
+if [ "$INLINE_PREREQ_DEP" = "dependency-ran" ]; then
+    echo "Inline dependency executed"
+else
+    echo "FAILURE: Inline dependency did not execute"
+    exit 1
+fi
 ```
 
 If succesful you will see:
 
-<!-- expected_similarity="(?s).*Prerequisites Ran.*Validated prerequisite skipped.*Nested level 1 prerequisite ran.*Nested level 2 prerequisite ran.*" -->
+<!-- expected_similarity=0.9 -->
 ```text
 Prerequisites Ran
 Validated prerequisite skipped
 Nested level 1 prerequisite ran
 Nested level 2 prerequisite ran
+Inline prerequisite section commands executed
+Inline dependency executed
 ```

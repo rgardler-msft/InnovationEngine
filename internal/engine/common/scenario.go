@@ -197,7 +197,7 @@ func partitionPrerequisiteBlocks(blocks []parsers.CodeBlock) (verification, body
 
 func splitScenarioBlocks(blocks []parsers.CodeBlock) (beforePrereqs, afterPrereqs []parsers.CodeBlock) {
 	for _, block := range blocks {
-		if block.Header == "Prerequisites" {
+		if block.InPrerequisiteSection {
 			beforePrereqs = append(beforePrereqs, block)
 		} else {
 			afterPrereqs = append(afterPrereqs, block)
@@ -212,18 +212,24 @@ func (ctx *prerequisiteInjectionContext) buildPrerequisiteExecutionBlocks(
 	verificationBlocks []parsers.CodeBlock,
 	bodyBlocks []parsers.CodeBlock,
 ) []parsers.CodeBlock {
-	blocks := []parsers.CodeBlock{ctx.buildValidationBanner(markerFile, display)}
+	hasVerification := len(verificationBlocks) > 0
+	blocks := []parsers.CodeBlock{ctx.buildValidationBanner(markerFile, display, hasVerification)}
 	blocks = append(blocks, ctx.buildVerificationBlocks(markerFile, display, verificationBlocks)...)
-	blocks = append(blocks, ctx.buildDecisionBanner(markerFile, display))
-	blocks = append(blocks, wrapPrerequisiteBodyBlocks(markerFile, display, bodyBlocks)...)
+	blocks = append(blocks, ctx.buildDecisionBanner(markerFile, display, hasVerification))
+	blocks = append(blocks, wrapPrerequisiteBodyBlocks(markerFile, display, bodyBlocks, hasVerification)...)
 	return blocks
 }
 
-func (ctx *prerequisiteInjectionContext) buildValidationBanner(markerFile, display string) parsers.CodeBlock {
+func (ctx *prerequisiteInjectionContext) buildValidationBanner(markerFile, display string, hasVerification bool) parsers.CodeBlock {
+	cleanup := ""
+	if !hasVerification {
+		cleanup = fmt.Sprintf("rm -f \"%s\"\n", markerFile)
+	}
 	banner := parsers.CodeBlock{
-		Language: "bash",
-		Header:   "Prerequisites",
-		Content:  fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\necho \"Validating Prerequisite: %s\"\n", markerFile, display, display),
+		Language:              "bash",
+		Header:                "Prerequisites",
+		Content:               fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\n%secho \"Validating Prerequisite: %s\"\n", markerFile, display, cleanup, display),
+		InPrerequisiteSection: true,
 	}
 
 	if !*ctx.prerequisiteSectionUsed && strings.TrimSpace(ctx.prerequisiteSectionText) != "" {
@@ -238,6 +244,7 @@ func (ctx *prerequisiteInjectionContext) buildVerificationBlocks(markerFile, dis
 	annotated := make([]parsers.CodeBlock, 0, len(verificationBlocks))
 	for i, block := range verificationBlocks {
 		updated := block
+		updated.InPrerequisiteSection = true
 		metadata := fmt.Sprintf("# ie:auto-prereq-verification marker=\"%s\" display=\"%s\" index=\"%d\" total=\"%d\"\n", markerFile, display, i+1, len(verificationBlocks))
 		updated.Content = metadata + block.Content
 		originalHeader := updated.Header
@@ -254,21 +261,33 @@ func (ctx *prerequisiteInjectionContext) buildVerificationBlocks(markerFile, dis
 	return annotated
 }
 
-func (ctx *prerequisiteInjectionContext) buildDecisionBanner(markerFile, display string) parsers.CodeBlock {
+func (ctx *prerequisiteInjectionContext) buildDecisionBanner(markerFile, display string, hasVerification bool) parsers.CodeBlock {
+	content := fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\n", markerFile, display)
+	if hasVerification {
+		content += fmt.Sprintf("if [ -f \"%s\" ]; then echo \"Skipping Prerequisite: %s (verification passed)\"; else echo \"Executing Prerequisite: %s\"; fi\n", markerFile, display, display)
+	} else {
+		content += fmt.Sprintf("echo \"Executing Prerequisite: %s\"\n", display)
+	}
 	return parsers.CodeBlock{
-		Language: "bash",
-		Header:   "Prerequisites",
-		Content:  fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\nif [ -f \"%s\" ]; then echo \"Skipping Prerequisite: %s (verification passed)\"; else echo \"Executing Prerequisite: %s\"; fi\n", markerFile, display, markerFile, display, display),
+		Language:              "bash",
+		Header:                "Prerequisites",
+		Content:               content,
+		InPrerequisiteSection: true,
 	}
 }
 
-func wrapPrerequisiteBodyBlocks(markerFile, display string, bodyBlocks []parsers.CodeBlock) []parsers.CodeBlock {
+func wrapPrerequisiteBodyBlocks(markerFile, display string, bodyBlocks []parsers.CodeBlock, hasVerification bool) []parsers.CodeBlock {
 	wrapped := make([]parsers.CodeBlock, 0, len(bodyBlocks))
 	for i := range bodyBlocks {
-		content := fmt.Sprintf("# ie:auto-prereq-body marker=\"%s\" display=\"%s\"\nif [ ! -f \"%s\" ]; then\n%s\nfi\n", markerFile, display, markerFile, bodyBlocks[i].Content)
+		bodyContent := bodyBlocks[i].Content
+		if hasVerification {
+			bodyContent = fmt.Sprintf("if [ ! -f \"%s\" ]; then\n%s\nfi", markerFile, bodyBlocks[i].Content)
+		}
+		content := fmt.Sprintf("# ie:auto-prereq-body marker=\"%s\" display=\"%s\"\n%s\n", markerFile, display, bodyContent)
 		bodyBlocks[i].Content = content
 		originalHeader := bodyBlocks[i].Header
 		bodyBlocks[i].Header = "Prerequisites"
+		bodyBlocks[i].InPrerequisiteSection = true
 		if originalHeader != "" && !strings.EqualFold(originalHeader, "Prerequisites") {
 			if strings.TrimSpace(bodyBlocks[i].Description) != "" {
 				bodyBlocks[i].Description = fmt.Sprintf("%s\n\n%s", originalHeader, bodyBlocks[i].Description)
@@ -399,6 +418,24 @@ func extractIntroTextBeforeSection(source []byte, sectionTitle string) string {
 	return intro
 }
 
+func detectPrerequisiteHeading(source []byte) string {
+	defaultHeading := "Prerequisites"
+	if len(source) == 0 {
+		return defaultHeading
+	}
+
+	headings := []string{"Prerequisites", "Prerequisite"}
+	text := strings.ReplaceAll(string(source), "\r\n", "\n")
+	for _, heading := range headings {
+		pattern := fmt.Sprintf(`(?m)^##\s+%s\s*$`, regexp.QuoteMeta(heading))
+		if regexp.MustCompile(pattern).FindStringIndex(text) != nil {
+			return heading
+		}
+	}
+
+	return defaultHeading
+}
+
 func stripTextFromFirstDescription(blocks []parsers.CodeBlock, text string) []parsers.CodeBlock {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
@@ -500,9 +537,10 @@ func CreateScenarioFromMarkdown(
 	logging.GlobalLogger.WithField("CodeBlocks", codeBlocks).
 		Debugf("Found %d code blocks", len(codeBlocks))
 
-	prerequisiteSectionText := parsers.ExtractSectionTextFromMarkdown(source, "Prerequisites")
+	prerequisiteHeading := detectPrerequisiteHeading(source)
+	prerequisiteSectionText := parsers.ExtractSectionTextFromMarkdown(source, prerequisiteHeading)
 	prerequisiteSectionUsed := false
-	introText := extractIntroTextBeforeSection(source, "Prerequisites")
+	introText := extractIntroTextBeforeSection(source, prerequisiteHeading)
 
 	// Extract the URLs of any prerequisite documents linked from the markdown file.
 	// Use a recursive helper so that prerequisites of prerequisites are also processed.

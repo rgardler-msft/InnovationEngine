@@ -6,6 +6,12 @@ It is often useful to break down a large document into component pieces. Long an
 
 Prerequisites are documents that should be executed before the current document proceeds. They are used to ensure, for example, that the environment is correctly setup. When running in interactive mode the user is given the opportunity to run the prerequsites interactively or non-interactively. This allows the user to skip details they already understand or to step through concepts that are new to them.
 
+Innovation Engine treats everything that appears inside the `## Prerequisite` (or `## Prerequisites`) heading as part of the prerequisite body. That means:
+
+- All nested headings beneath the prerequisite section are still part of the prerequisite and their code blocks execute in the order they appear, top to bottom.
+- Any Markdown links to other executable documents that appear inside the prerequisite section are queued immediately, so dependencies are executed exactly when they are discovered.
+- If a prerequisite file omits a Verification block, its commands always run (marker files from prior runs are cleared first) to guarantee repeatable execution.
+
 ```bash
 if [ -z "$UNIQUE_HASH" ]; then
     echo "Unique hash has no value yet."

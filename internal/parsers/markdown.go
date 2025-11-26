@@ -51,11 +51,12 @@ type ExpectedOutputBlock struct {
 
 // The representation of a code block in a markdown file.
 type CodeBlock struct {
-	Language       string              `json:"language"`
-	Content        string              `json:"content"`
-	Header         string              `json:"header"`
-	Description    string              `json:"description"`
-	ExpectedOutput ExpectedOutputBlock `json:"resultBlock"`
+	Language              string              `json:"language"`
+	Content               string              `json:"content"`
+	Header                string              `json:"header"`
+	Description           string              `json:"description"`
+	ExpectedOutput        ExpectedOutputBlock `json:"resultBlock"`
+	InPrerequisiteSection bool                `json:"inPrerequisiteSection"`
 }
 
 // Assumes the title of the scenario is the first h1 header in the
@@ -101,6 +102,7 @@ func ExtractCodeBlocksFromAst(
 	var lastExpectedRegex *regexp.Regexp
 	var lastNode ast.Node
 	var currentParagraphs string
+	var inPrerequisitesSection bool
 
 	if sourceName == "" {
 		sourceName = "<unknown source>"
@@ -111,7 +113,15 @@ func ExtractCodeBlocksFromAst(
 			switch n := node.(type) {
 			// Set the last header when we encounter a heading.
 			case *ast.Heading:
-				lastHeader = string(extractTextFromMarkdown(&n.BaseBlock, source))
+				headingText := string(extractTextFromMarkdown(&n.BaseBlock, source))
+				lastHeader = headingText
+				if n.Level == 2 {
+					if isPrerequisiteHeading(headingText) {
+						inPrerequisitesSection = true
+					} else {
+						inPrerequisitesSection = false
+					}
+				}
 				lastNode = node
 			case *ast.Paragraph:
 				if currentParagraphs != "" {
@@ -174,10 +184,11 @@ func ExtractCodeBlocksFromAst(
 				for _, desiredLanguage := range languagesToExtract {
 					if language == desiredLanguage {
 						command := CodeBlock{
-							Language:    language,
-							Content:     content,
-							Header:      lastHeader,
-							Description: description,
+							Language:              language,
+							Content:               content,
+							Header:                lastHeader,
+							Description:           description,
+							InPrerequisiteSection: inPrerequisitesSection,
 						}
 						commands = append(commands, command)
 						break
@@ -278,6 +289,11 @@ func ExtractScenarioVariablesFromAst(node ast.Node, source []byte) map[string]st
 	return scenarioVariables
 }
 
+func isPrerequisiteHeading(text string) bool {
+	trimmed := strings.TrimSpace(strings.ToLower(text))
+	return trimmed == "prerequisites" || trimmed == "prerequisite"
+}
+
 // Extracts a list of markdown URLs that are contained within the section that has the title "Prerequisites".
 func ExtractPrerequisiteUrlsFromAst(node ast.Node, source []byte) ([]string, error) {
 	var urls []string
@@ -289,7 +305,7 @@ func ExtractPrerequisiteUrlsFromAst(node ast.Node, source []byte) ([]string, err
 			case *ast.Heading:
 				if n.Level == 2 {
 					headingText := string(extractTextFromMarkdown(&n.BaseBlock, source))
-					if headingText == "Prerequisites" {
+					if isPrerequisiteHeading(headingText) {
 						inPrerequisitesSection = true
 					} else {
 						inPrerequisitesSection = false
