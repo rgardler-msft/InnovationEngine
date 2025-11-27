@@ -22,7 +22,7 @@ fi
 echo "Prerequisite needs to run PREREQ_RAN is not set."
 ```
 
-If the similarity test fails then the main content of this document will be executed.
+If the similarity test fails then the main content of this document will be executed. In this test file the verification section is designed to fail until the document itslef has been exectuted.
 
 <!-- expected_similarity=".*already executed" -->
 ```text

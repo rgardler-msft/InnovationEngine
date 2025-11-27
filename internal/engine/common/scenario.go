@@ -368,11 +368,25 @@ func RegisterMissingPrerequisite(msg string) {
 // SummarizeMissingPrerequisites logs a consolidated, de-duplicated summary of any missing prerequisites.
 // Intended to be called once at the end of scenario execution.
 func SummarizeMissingPrerequisites() {
+	unique := drainMissingPrerequisites()
+	for _, m := range unique {
+		logging.GlobalLogger.Warn(m)
+	}
+}
+
+// DrainMissingPrerequisites returns any accumulated missing prerequisite messages and
+// clears the internal buffer so future scenarios start clean. Callers that need
+// to surface these issues directly (for example, ie inspect) can rely on this
+// instead of the logging-only SummarizeMissingPrerequisites helper.
+func DrainMissingPrerequisites() []string {
+	return drainMissingPrerequisites()
+}
+
+func drainMissingPrerequisites() []string {
 	if len(missingPrereqMessages) == 0 {
-		return
+		return nil
 	}
 
-	// De-duplicate while preserving stable output order.
 	seen := make(map[string]bool)
 	unique := make([]string, 0, len(missingPrereqMessages))
 	for _, m := range missingPrereqMessages {
@@ -381,14 +395,9 @@ func SummarizeMissingPrerequisites() {
 			unique = append(unique, m)
 		}
 	}
-	// Sort for deterministic output when there are many, then re-log each warning.
 	sort.Strings(unique)
-	for _, m := range unique {
-		logging.GlobalLogger.Warn(m)
-	}
-
-	// Reset so subsequent scenarios in the same process start clean.
 	missingPrereqMessages = nil
+	return unique
 }
 
 func extractIntroTextBeforeSection(source []byte, sectionTitle string) string {

@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	enginepkg "github.com/Azure/InnovationEngine/internal/engine"
 	"github.com/Azure/InnovationEngine/internal/engine/common"
 	"github.com/Azure/InnovationEngine/internal/engine/environments"
+	"github.com/Azure/InnovationEngine/internal/lib"
 	"github.com/Azure/InnovationEngine/internal/logging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -136,14 +138,44 @@ func resetCommandTreeFlags(cmd *cobra.Command) {
 }
 
 func writeTempScenario(t *testing.T, name string) string {
+	content := fmt.Sprintf(
+		"# %s\n\n## Step\n\nThis step echoes hello.\n\n```bash\necho hello\n```\n",
+		name,
+	)
+	return writeScenarioWithContent(t, content)
+}
+
+func writeScenarioWithContent(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "scenario.md")
-	content := "# " + name + "\n\n## Step\n\n```bash\necho hello\n```\n"
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("failed to write temp scenario: %v", err)
 	}
 	return path
+}
+
+func overrideDefaultStateFiles(t *testing.T) (string, string) {
+	t.Helper()
+	originalEnv := lib.DefaultEnvironmentStateFile
+	originalWD := lib.DefaultWorkingDirectoryStateFile
+	newEnv := filepath.Join(t.TempDir(), "env-vars")
+	newWD := filepath.Join(t.TempDir(), "working-dir")
+	lib.DefaultEnvironmentStateFile = newEnv
+	lib.DefaultWorkingDirectoryStateFile = newWD
+	if flag := envConfigCommand.Flags().Lookup("state-file"); flag != nil {
+		flag.DefValue = newEnv
+		_ = flag.Value.Set(newEnv)
+	}
+	t.Cleanup(func() {
+		lib.DefaultEnvironmentStateFile = originalEnv
+		lib.DefaultWorkingDirectoryStateFile = originalWD
+		if flag := envConfigCommand.Flags().Lookup("state-file"); flag != nil {
+			flag.DefValue = originalEnv
+			_ = flag.Value.Set(originalEnv)
+		}
+	})
+	return newEnv, newWD
 }
 
 func TestCommandsRequireMarkdownArgument(t *testing.T) {
@@ -219,6 +251,27 @@ func TestEnvConfigCommand_PrintsExports(t *testing.T) {
 	}
 	if !(alphaIdx < betaIdx) {
 		t.Fatalf("expected alphabetical ordering, got %q", output)
+	}
+}
+
+func TestEnvConfigReadsDefaultSnapshotAfterExecute(t *testing.T) {
+	envSnapshot, _ := overrideDefaultStateFiles(t)
+	scenario := writeScenarioWithContent(t, "# Scenario\n\n## Step\n\n```bash\nexport AZ_TEST_VAR=demo\n```\n")
+	if err := runRootWithArgs(t, "clear-env", "--force"); err != nil {
+		t.Fatalf("clear-env failed: %v", err)
+	}
+	if err := runRootWithArgs(t, "execute", scenario); err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+	if _, err := os.Stat(envSnapshot); err != nil {
+		t.Fatalf("expected environment snapshot at %s: %v", envSnapshot, err)
+	}
+	stdout, _, err := runRootWithArgsCapturing(t, "env-config")
+	if err != nil {
+		t.Fatalf("env-config failed: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "export AZ_TEST_VAR=\"demo\"") {
+		t.Fatalf("expected AZ_TEST_VAR export, got %q", stdout.String())
 	}
 }
 

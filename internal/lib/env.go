@@ -51,7 +51,7 @@ func ParseEnvironmentVariableAssignments(assignments []string) (map[string]strin
 
 // Location where the environment and working directory state from commands are
 // to be captured and sent to for being able to share state across commands.
-var DefaultEnvironmentStateFile = "/tmp/env-vars"
+var DefaultEnvironmentStateFile = "/tmp/ie-env-vars"
 var DefaultWorkingDirectoryStateFile = "/tmp/working-dir"
 
 // Loads a file that contains environment variables

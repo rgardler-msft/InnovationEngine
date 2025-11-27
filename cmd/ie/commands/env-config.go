@@ -27,9 +27,10 @@ func init() {
 var envConfigCommand = &cobra.Command{
 	Use:   "env-config",
 	Short: "Print stored environment variables as source-able exports",
-	Long: `Reads the persisted environment state file (default /tmp/env-vars)
-and renders its contents as export statements. Capture the output and source it
-later to reproduce the environment from a previous Innovation Engine run.
+	Long: `Reads the persisted environment state file (default /tmp/ie-env-vars,
+	override with --state-file) and renders its contents as export statements.
+	Capture the output and source it later to reproduce the environment from a
+	previous Innovation Engine run.
 
 Examples:
   ie env-config                            # Dump all persisted variables

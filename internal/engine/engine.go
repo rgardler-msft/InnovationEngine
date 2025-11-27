@@ -195,7 +195,7 @@ func (e *Engine) InteractWithScenario(scenario *common.Scenario) error {
 	case environments.EnvironmentsAzure, environments.EnvironmentsOCD:
 
 			logging.GlobalLogger.Info(
-				"Cleaning environment variable file located at /tmp/env-vars",
+				"Cleaning environment variable file located at /tmp/ie-env-vars",
 			)
 
 			err := lib.CleanEnvironmentStateFile(lib.DefaultEnvironmentStateFile)

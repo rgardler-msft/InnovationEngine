@@ -523,7 +523,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 	switch {
 	case e.Configuration.Environment.IsAzureLike():
 		logging.GlobalLogger.Info(
-			"Cleaning environment variable file located at /tmp/env-vars",
+			"Cleaning environment variable file located at /tmp/ie-env-vars",
 		)
 		err := lib.CleanEnvironmentStateFile(lib.DefaultEnvironmentStateFile)
 		if err != nil {
@@ -541,7 +541,9 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 		}
 
 	default:
-		lib.DeleteEnvironmentStateFile(lib.DefaultEnvironmentStateFile)
+		if err := lib.CleanEnvironmentStateFile(lib.DefaultEnvironmentStateFile); err != nil {
+			logging.GlobalLogger.Warnf("Error cleaning environment variables: %s", err.Error())
+		}
 		lib.DeleteWorkingDirectoryStateFile(lib.DefaultWorkingDirectoryStateFile)
 	}
 

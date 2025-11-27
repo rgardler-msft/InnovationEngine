@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 )
@@ -63,6 +64,15 @@ func LevelFromString(level string) Level {
 
 var GlobalLogger = logrus.New()
 
+var (
+	suppressWarnConsole bool
+	warnCapture         struct {
+		sync.Mutex
+		depth  int
+		buffer []string
+	}
+)
+
 const (
 	DefaultLogFile  = "ie.log"
 	maxLogSnapshots = 5
@@ -90,6 +100,35 @@ func Init(level Level, logPath string) {
 
 	// Add a hook to always echo warnings to the console in orange so they are visible
 	GlobalLogger.AddHook(&warnConsoleHook{})
+}
+
+// StartWarningCapture suppresses immediate console emission of warning log lines
+// and buffers them for later retrieval. The returned function stops the capture
+// session and yields the buffered warnings in FIFO order.
+func StartWarningCapture() func() []string {
+	warnCapture.Lock()
+	warnCapture.depth++
+	if warnCapture.depth == 1 {
+		warnCapture.buffer = nil
+		suppressWarnConsole = true
+	}
+	warnCapture.Unlock()
+
+	return func() []string {
+		warnCapture.Lock()
+		defer warnCapture.Unlock()
+		if warnCapture.depth == 0 {
+			return nil
+		}
+		warnCapture.depth--
+		if warnCapture.depth == 0 {
+			suppressWarnConsole = false
+			captured := warnCapture.buffer
+			warnCapture.buffer = nil
+			return captured
+		}
+		return nil
+	}
 }
 
 func configureLogWriter(logPath string) (*os.File, error) {
@@ -162,14 +201,32 @@ func (h *warnConsoleHook) Levels() []logrus.Level {
 }
 
 func (h *warnConsoleHook) Fire(entry *logrus.Entry) error {
-	color := "\x1b[33m" // fallback yellow
-	reset := "\x1b[0m"
-	// Prefer a 256-color orange if the terminal likely supports it.
-	if supports256Color() {
-		color = "\x1b[38;5;208m" // orange
+	plain := formatWarningMessage(entry)
+	if captureWarning(plain) && suppressWarnConsole {
+		return nil
 	}
 
-	// Reconstruct a simple field string (key=value) if present.
+	color := "\x1b[33m" // fallback yellow
+	reset := "\x1b[0m"
+	if supports256Color() {
+		color = "\x1b[38;5;208m"
+	}
+	fmtStr := color + plain + reset + "\n"
+	_, _ = os.Stderr.WriteString(fmtStr)
+	return nil
+}
+
+func captureWarning(message string) bool {
+	warnCapture.Lock()
+	defer warnCapture.Unlock()
+	if warnCapture.depth == 0 {
+		return false
+	}
+	warnCapture.buffer = append(warnCapture.buffer, message)
+	return true
+}
+
+func formatWarningMessage(entry *logrus.Entry) string {
 	var fieldParts []string
 	for k, v := range entry.Data {
 		fieldParts = append(fieldParts, k+"="+toString(v))
@@ -178,11 +235,7 @@ func (h *warnConsoleHook) Fire(entry *logrus.Entry) error {
 	if len(fieldParts) > 0 {
 		fields = " (" + strings.Join(fieldParts, ", ") + ")"
 	}
-
-	// Write to stderr directly.
-	fmtStr := color + "WARNING: " + entry.Message + fields + reset + "\n"
-	_, _ = os.Stderr.WriteString(fmtStr)
-	return nil
+	return "WARNING: " + entry.Message + fields
 }
 
 func supports256Color() bool {
