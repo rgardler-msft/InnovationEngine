@@ -172,6 +172,7 @@ func AttachResourceURIsToAzureStatus(
 		logging.GlobalLogger.Info(
 			"Not fetching resource URIs because we're not in the OCD environment.",
 		)
+		return
 	}
 
 	if resourceGroupName == "" {

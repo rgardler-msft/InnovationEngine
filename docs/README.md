@@ -25,6 +25,7 @@ Following the playbooks keeps large tutorials maintainable and repeatable across
 Keep these files nearby when you need specific API or runtime details:
 
 - `environmentVariables.md` and `environmentVariables.ini` – catalog of built-in variables and sample defaults.
+- `environments.md` – explains the `--environment` flag (local, GitHub Action, OCD, Azure) and when to select each mode.
 - `modesOfOperation.md` – deeper dive into `execute`, `interactive`, and `test` behaviors (pausing rules, failure semantics, etc.).
 
 They pair well with the codebase when you are debugging or extending the engine itself.
