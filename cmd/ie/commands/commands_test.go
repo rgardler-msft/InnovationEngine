@@ -273,6 +273,9 @@ func TestEnvConfigReadsDefaultSnapshotAfterExecute(t *testing.T) {
 	if !strings.Contains(stdout.String(), "export AZ_TEST_VAR=\"demo\"") {
 		t.Fatalf("expected AZ_TEST_VAR export, got %q", stdout.String())
 	}
+	if strings.Contains(stdout.String(), "export PATH=") {
+		t.Fatalf("env-config should not emit baseline variables: %q", stdout.String())
+	}
 }
 
 func TestEnvConfigCommand_MissingFileErrors(t *testing.T) {

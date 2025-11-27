@@ -64,10 +64,12 @@ echo $PATH
 
 ## Exporting Captured Environment Variables
 
-IE persists every command's environment in `/tmp/ie-env-vars` by default. Use
+IE persists only the variables introduced or modified by an executable
+document in `/tmp/ie-env-vars` by default. The host's base environment is
+filtered out so `ie env-config` emits just the values the doc exported. Use
 the `--state-file` flag (for example, `ie env-config --state-file /tmp/custom`) to
 point at an alternate location. After a deployment you can convert the state
-file into a source-able script with the new CLI command:
+file into a source-able script with the CLI command:
 
 ```bash
 ie env-config > ie-env.sh

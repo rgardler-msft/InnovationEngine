@@ -72,6 +72,11 @@ Examples:
 			} else {
 				fmt.Println("Environment variables cleared successfully.")
 			}
+
+			baselineFile := lib.BaselineEnvironmentStateFile(lib.DefaultEnvironmentStateFile)
+			if err := os.Remove(baselineFile); err != nil && !os.IsNotExist(err) {
+				return commandError(cmd, err, false, "error clearing environment baseline state")
+			}
 		}
 
 		// Clear working directory state if requested

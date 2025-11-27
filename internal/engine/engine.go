@@ -35,6 +35,15 @@ type Engine struct {
 	Configuration EngineConfiguration
 }
 
+func captureEnvironmentBaseline() {
+	if err := lib.SaveEnvironmentBaselineFile(
+		lib.DefaultEnvironmentStateFile,
+		lib.GetEnvironmentVariables(),
+	); err != nil {
+		logging.GlobalLogger.Warnf("Failed to capture environment baseline: %v", err)
+	}
+}
+
 // / Create a new engine instance.
 func NewEngine(configuration EngineConfiguration) (*Engine, error) {
 	return &Engine{
@@ -46,6 +55,7 @@ func NewEngine(configuration EngineConfiguration) (*Engine, error) {
 func (e *Engine) ExecuteScenario(scenario *common.Scenario) error {
 	return fs.UsingDirectory(e.Configuration.WorkingDirectory, func() error {
 		az.SetCorrelationId(e.Configuration.CorrelationId, scenario.Environment)
+		captureEnvironmentBaseline()
 
 		// Execute the steps
 		fmt.Println(ui.ScenarioTitleStyle.Render(scenario.Name))
@@ -72,6 +82,9 @@ func (e *Engine) TestScenario(scenario *common.Scenario) error {
 		stepsToExecute := filterDeletionCommands(scenario.Steps, e.Configuration.DoNotDelete)
 
 		initialEnvironmentVariables := lib.GetEnvironmentVariables()
+		if err := lib.SaveEnvironmentBaselineFile(lib.DefaultEnvironmentStateFile, initialEnvironmentVariables); err != nil {
+			logging.GlobalLogger.Warnf("Failed to capture environment baseline: %v", err)
+		}
 
 		model, err := test.NewTestModeModel(
 			scenario.Name,
@@ -159,6 +172,7 @@ func (e *Engine) TestScenario(scenario *common.Scenario) error {
 func (e *Engine) InteractWithScenario(scenario *common.Scenario) error {
 	return fs.UsingDirectory(e.Configuration.WorkingDirectory, func() error {
 		az.SetCorrelationId(e.Configuration.CorrelationId, scenario.Environment)
+		captureEnvironmentBaseline()
 
 		stepsToExecute := filterDeletionCommands(scenario.Steps, e.Configuration.DoNotDelete)
 

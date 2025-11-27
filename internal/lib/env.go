@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/Azure/InnovationEngine/internal/lib/fs"
@@ -54,6 +55,53 @@ func ParseEnvironmentVariableAssignments(assignments []string) (map[string]strin
 var DefaultEnvironmentStateFile = "/tmp/ie-env-vars"
 var DefaultWorkingDirectoryStateFile = "/tmp/working-dir"
 
+// BaselineEnvironmentStateFile returns the file path that stores the original
+// process environment used to filter persisted values. Callers can pass a
+// custom state file path; otherwise the default is used.
+func BaselineEnvironmentStateFile(stateFile string) string {
+	if strings.TrimSpace(stateFile) == "" {
+		stateFile = DefaultEnvironmentStateFile
+	}
+	return stateFile + ".baseline"
+}
+
+// SaveEnvironmentBaselineFile captures the provided environment map and writes
+// it to the baseline file corresponding to the supplied state file path.
+func SaveEnvironmentBaselineFile(stateFile string, env map[string]string) error {
+	baselinePath := BaselineEnvironmentStateFile(stateFile)
+	return writeEnvironmentStateFile(baselinePath, filterInvalidKeys(env))
+}
+
+// FilterEnvironmentStateFile keeps only the variables whose values differ from
+// the baseline environment. This ensures we persist/export only the variables
+// introduced or modified by the executable document itself.
+func FilterEnvironmentStateFile(stateFile, baselineFile string) error {
+	if strings.TrimSpace(stateFile) == "" {
+		stateFile = DefaultEnvironmentStateFile
+	}
+
+	if !fs.FileExists(stateFile) {
+		return nil
+	}
+
+	currentEnv, err := LoadEnvironmentStateFile(stateFile)
+	if err != nil {
+		return err
+	}
+
+	baselineEnv := make(map[string]string)
+	if strings.TrimSpace(baselineFile) != "" && fs.FileExists(baselineFile) {
+		baselineEnv, err = LoadEnvironmentStateFile(baselineFile)
+		if err != nil {
+			return err
+		}
+	}
+
+	filtered := filterAgainstBaseline(currentEnv, baselineEnv)
+	filtered = filterInvalidKeys(filtered)
+	return writeEnvironmentStateFile(stateFile, filtered)
+}
+
 // Loads a file that contains environment variables
 func LoadEnvironmentStateFile(path string) (map[string]string, error) {
 	if !fs.FileExists(path) {
@@ -92,20 +140,7 @@ func CleanEnvironmentStateFile(path string) error {
 	}
 
 	env = filterInvalidKeys(env)
-
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-
-	writer := bufio.NewWriter(file)
-	for k, v := range env {
-		_, err := fmt.Fprintf(writer, "%s=\"%s\"\n", k, v)
-		if err != nil {
-			return err
-		}
-	}
-	return writer.Flush()
+	return writeEnvironmentStateFile(path, env)
 }
 
 var environmentVariableName = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
@@ -118,6 +153,44 @@ func filterInvalidKeys(envMap map[string]string) map[string]string {
 		}
 	}
 	return validEnvMap
+}
+
+func filterAgainstBaseline(current map[string]string, baseline map[string]string) map[string]string {
+	if len(current) == 0 {
+		return current
+	}
+
+	filtered := make(map[string]string)
+	for key, value := range current {
+		if baseValue, exists := baseline[key]; !exists || baseValue != value {
+			filtered[key] = value
+		}
+	}
+
+	return filtered
+}
+
+func writeEnvironmentStateFile(path string, env map[string]string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if _, err := fmt.Fprintf(writer, "%s=\"%s\"\n", key, env[key]); err != nil {
+			return err
+		}
+	}
+
+	return writer.Flush()
 }
 
 // SanitizeEnvironmentMap removes any keys that are not valid shell environment

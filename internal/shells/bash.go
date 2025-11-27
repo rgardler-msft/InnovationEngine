@@ -11,6 +11,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/Azure/InnovationEngine/internal/lib"
+	"github.com/Azure/InnovationEngine/internal/logging"
 )
 
 func appendToBashHistory(command string, filePath string) error {
@@ -134,6 +135,13 @@ func executeBashCommandImpl(
 	}
 
 	err = commandToExecute.Run()
+
+	if filterErr := lib.FilterEnvironmentStateFile(
+		lib.DefaultEnvironmentStateFile,
+		lib.BaselineEnvironmentStateFile(lib.DefaultEnvironmentStateFile),
+	); filterErr != nil {
+		logging.GlobalLogger.Warnf("Failed to filter persisted environment variables: %v", filterErr)
+	}
 
 	// TODO(vmarcella): Find a better way to handle this.
 	if config.InteractiveCommand {

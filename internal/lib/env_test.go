@@ -1,6 +1,10 @@
 package lib
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestEnvironmentVariableValidationAndFiltering(t *testing.T) {
 	// Test key validation
@@ -65,4 +69,63 @@ func TestEnvironmentVariableValidationAndFiltering(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestFilterAgainstBaseline(t *testing.T) {
+	current := map[string]string{
+		"EV_ALPHA": "1",
+		"PATH":     "/custom/bin",
+		"HOME":     "/home/user",
+	}
+	baseline := map[string]string{
+		"PATH": "/usr/bin",
+		"HOME": "/home/user",
+	}
+
+	filtered := filterAgainstBaseline(current, baseline)
+
+	if len(filtered) != 2 {
+		t.Fatalf("expected 2 filtered entries, got %d", len(filtered))
+	}
+	if filtered["EV_ALPHA"] != "1" {
+		t.Fatalf("expected EV_ALPHA to survive filtering")
+	}
+	if filtered["PATH"] != "/custom/bin" {
+		t.Fatalf("expected PATH difference to be retained")
+	}
+	if _, exists := filtered["HOME"]; exists {
+		t.Fatalf("did not expect unchanged HOME to survive filtering")
+	}
+}
+
+func TestFilterEnvironmentStateFile(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := filepath.Join(tempDir, "env-vars")
+	baselinePath := filepath.Join(tempDir, "env-vars.baseline")
+
+	if err := os.WriteFile(statePath, []byte("PATH=/usr/bin\nEV_BETA=demo\n"), 0600); err != nil {
+		t.Fatalf("failed to write state file: %v", err)
+	}
+	if err := os.WriteFile(baselinePath, []byte("PATH=/usr/bin\n"), 0600); err != nil {
+		t.Fatalf("failed to write baseline file: %v", err)
+	}
+
+	if err := FilterEnvironmentStateFile(statePath, baselinePath); err != nil {
+		t.Fatalf("filtering failed: %v", err)
+	}
+
+	filtered, err := LoadEnvironmentStateFile(statePath)
+	if err != nil {
+		t.Fatalf("failed to reload filtered state: %v", err)
+	}
+
+	if len(filtered) != 1 {
+		t.Fatalf("expected only one entry after filtering, got %d", len(filtered))
+	}
+	if filtered["EV_BETA"] != "demo" {
+		t.Fatalf("expected EV_BETA to remain, got %v", filtered)
+	}
+	if _, exists := filtered["PATH"]; exists {
+		t.Fatalf("PATH should have been removed by filtering")
+	}
 }
