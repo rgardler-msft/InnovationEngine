@@ -86,14 +86,14 @@ func ExecuteCodeBlockAsync(codeBlock parsers.CodeBlock, env map[string]string) t
 		actualOutput := output.StdOut
 		expectedOutput := codeBlock.ExpectedOutput.Content
 		expectedSimilarity := codeBlock.ExpectedOutput.ExpectedSimilarity
-		expectedRegex := codeBlock.ExpectedOutput.ExpectedRegex
+		expectedRegexPattern := codeBlock.ExpectedOutput.ExpectedRegexPattern
 		expectedOutputLanguage := codeBlock.ExpectedOutput.Language
 
 		score, outputComparisonError := CompareCommandOutputs(
 			actualOutput,
 			expectedOutput,
 			expectedSimilarity,
-			expectedRegex,
+			expectedRegexPattern,
 			expectedOutputLanguage,
 		)
 

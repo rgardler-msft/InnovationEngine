@@ -1,50 +1,45 @@
-# Testing multi Line code block
+# Simple Similarity Test, exact match
 
-This command deliberately emits a predictable greeting so we can assert similarity handling.
+This command emits a predictable greeting so we can assert similarity handling.
 
-```azurecli-interactive
+```bash
 echo "Hello World"
 ```
 
-This is what the expected output should be
+This is what the expected output should be:
 
-<!--expected_similarity=0.8-->
+<!--expected_similarity=1.0-->
 
 ```text
-Hello world
+Hello World
 ```
 
-# Testing multi Line code block
+# Simple Similarity Test, fuzzy match
 
-Here we span lines with a continuation character to ensure the parser keeps them together.
+This command emits a predictable greeting so we can assert similarity handling.
 
-```azurecli-interactive
-echo "Hello \
-world"
+```bash
+echo "Hello Jane."
 ```
 
-# Output Should Fail
-
-This expected output intentionally mismatches the command above.
+This is what the expected output should be:
 
 <!--expected_similarity=0.9-->
 
 ```text
-Hello world
+Hello Joe
 ```
 
-# Code block
+# Multi-line code block
 
-We repeat the multiline command to exercise additional comparisons.
+Here we span lines with a continuation character to ensure the parser keeps them together.
 
-```azurecli-interactive
+```bash
 echo "Hello \
 world"
 ```
 
-# Output Should Pass
-
-This expected output mirrors the command exactly so similarity should succeed.
+This expected output here is the same, regardless of the multiline code block:
 
 <!--expected_similarity=1.0-->
 
@@ -52,21 +47,34 @@ This expected output mirrors the command exactly so similarity should succeed.
 Hello world
 ```
 
-# Code block
+# Basic Regex Matching
 
-One more repeated command keeps the test matrix simple.
+This block ensures regex expectations can reference exported environment variables.
 
-```azurecli-interactive
-echo "Hello \
-world"
+```bash
+export FMT_REGEX_VALUE="RegEx World"
+echo "Hello $FMT_REGEX_VALUE"
 ```
 
-# Bad similarity - should fail
-
-This final expectation purposefully uses a failing similarity threshold.
-
-<!--expected_similarity=0.9-->
+<!-- expected_similarity="^Hello.*"-->
 
 ```text
-Hello world
+Hello, anyone there?
 ```
+
+# Regex with ENV variable expansion
+
+This block ensures regex expectations can reference exported environment variables.
+
+```bash
+export FMT_REGEX_GREETING="Hello"
+export FMT_REGEX_VALUE="RegEx World"
+echo "$FMT_REGEX_GREETING $FMT_REGEX_VALUE"
+```
+
+<!-- expected_similarity="^$FMT_REGEX_GREETING $FMT_REGEX_VALUE"-->
+
+```text
+Hello RegEx World
+```
+

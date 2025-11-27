@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 
 	"github.com/Azure/InnovationEngine/internal/parsers"
@@ -21,7 +20,7 @@ func TestExecuteCodeBlockAsync_VerificationMismatchDoesNotFail(t *testing.T) {
 		Language: "bash",
 		Content:  fmt.Sprintf("# ie:auto-prereq-verification marker=\"%s\" display=\"Test Prereq\"\necho \"Prerequisite needs to run\"\n", markerPath),
 		ExpectedOutput: parsers.ExpectedOutputBlock{
-			ExpectedRegex: regexp.MustCompile("already executed"),
+			ExpectedRegexPattern: "already executed",
 		},
 	}
 
@@ -48,7 +47,7 @@ func TestExecuteCodeBlockAsync_VerificationSuccessCreatesMarker(t *testing.T) {
 		Language: "bash",
 		Content:  fmt.Sprintf("# ie:auto-prereq-verification marker=\"%s\" display=\"%s\"\necho \"validated\"\n", markerPath, display),
 		ExpectedOutput: parsers.ExpectedOutputBlock{
-			ExpectedRegex: regexp.MustCompile("validated"),
+			ExpectedRegexPattern: "validated",
 		},
 	}
 

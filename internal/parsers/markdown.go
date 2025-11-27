@@ -43,10 +43,10 @@ func ExtractYamlMetadataFromAst(node ast.Node) map[string]interface{} {
 // for scenarios that have expected output that should be validated against the
 // actual output.
 type ExpectedOutputBlock struct {
-	Language           string         `json:"language"`
-	Content            string         `json:"content"`
-	ExpectedSimilarity float64        `json:"expectedSimilarityScore"`
-	ExpectedRegex      *regexp.Regexp `json:"expectedRegexPattern"`
+	Language             string  `json:"language"`
+	Content              string  `json:"content"`
+	ExpectedSimilarity   float64 `json:"expectedSimilarityScore"`
+	ExpectedRegexPattern string  `json:"expectedRegexPattern"`
 }
 
 // The representation of a code block in a markdown file.
@@ -100,7 +100,7 @@ func ExtractCodeBlocksFromAst(
 	var commands []CodeBlock
 	var nextBlockIsExpectedOutput bool
 	var lastExpectedSimilarityScore float64
-	var lastExpectedRegex *regexp.Regexp
+	var lastExpectedRegexPattern string
 	var lastNode ast.Node
 	var currentParagraphs string
 	var inPrerequisitesSection bool
@@ -157,12 +157,7 @@ func ExtractCodeBlocksFromAst(
 						return ast.WalkStop, errors.New("No regex found")
 					}
 
-					re, err := regexp.Compile(match)
-					if err != nil {
-						return ast.WalkStop, fmt.Errorf("Cannot compile the following regex: %q", match)
-					}
-
-					lastExpectedRegex = re
+					lastExpectedRegexPattern = match
 				}
 
 				nextBlockIsExpectedOutput = true
@@ -201,17 +196,17 @@ func ExtractCodeBlocksFromAst(
 						// are no commands, then we ignore the expected output.
 						if len(commands) > 0 {
 							expectedOutputBlock := ExpectedOutputBlock{
-								Language:           language,
-								Content:            extractTextFromMarkdown(&n.BaseBlock, source),
-								ExpectedSimilarity: lastExpectedSimilarityScore,
-								ExpectedRegex:      lastExpectedRegex,
+								Language:             language,
+								Content:              extractTextFromMarkdown(&n.BaseBlock, source),
+								ExpectedSimilarity:   lastExpectedSimilarityScore,
+								ExpectedRegexPattern: lastExpectedRegexPattern,
 							}
 							commands[len(commands)-1].ExpectedOutput = expectedOutputBlock
 
 							// Reset the expected output state.
 							nextBlockIsExpectedOutput = false
 							lastExpectedSimilarityScore = 0
-							lastExpectedRegex = nil
+							lastExpectedRegexPattern = ""
 						}
 						break
 					}

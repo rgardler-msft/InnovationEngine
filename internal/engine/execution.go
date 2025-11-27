@@ -3,7 +3,6 @@ package engine
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -432,10 +431,10 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 							actualOutput := commandOutput.StdOut
 							expectedOutput := block.ExpectedOutput.Content
 							expectedSimilarity := block.ExpectedOutput.ExpectedSimilarity
-							expectedRegex := block.ExpectedOutput.ExpectedRegex
+							expectedRegexPattern := block.ExpectedOutput.ExpectedRegexPattern
 							expectedOutputLanguage := block.ExpectedOutput.Language
 
-							_, outputComparisonError := common.CompareCommandOutputs(actualOutput, expectedOutput, expectedSimilarity, expectedRegex, expectedOutputLanguage)
+							_, outputComparisonError := common.CompareCommandOutputs(actualOutput, expectedOutput, expectedSimilarity, expectedRegexPattern, expectedOutputLanguage)
 
 							if outputComparisonError != nil {
 								if isVerificationBlock {
@@ -450,7 +449,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 										block.ExpectedOutput.Content,
 										commandOutput.StdOut,
 										expectedSimilarity,
-										expectedRegex,
+										expectedRegexPattern,
 										true,
 									)
 									// Suppress noisy warning log for expected verification failure; body will execute.
@@ -467,7 +466,7 @@ func (e *Engine) ExecuteAndRenderSteps(steps []common.Step, env map[string]strin
 									block.ExpectedOutput.Content,
 									commandOutput.StdOut,
 									expectedSimilarity,
-									expectedRegex,
+									expectedRegexPattern,
 									false,
 								)
 
@@ -675,7 +674,7 @@ func stripPrereqBodyWrapper(content string) string {
 	return inner
 }
 
-func renderExpectedActual(expected string, actual string, expectedSimilarity float64, expectedRegex *regexp.Regexp, isVerification bool) {
+func renderExpectedActual(expected string, actual string, expectedSimilarity float64, expectedRegexPattern string, isVerification bool) {
 	trimmedActual := strings.TrimRight(actual, "\n")
 	trimmedExpected := strings.TrimRight(expected, "\n")
 
@@ -685,10 +684,10 @@ func renderExpectedActual(expected string, actual string, expectedSimilarity flo
 		fmt.Println("  " + ui.ErrorMessageStyle.Render("Expected output does not match:"))
 	}
 
-	showSimilarity := expectedRegex == nil
+	showSimilarity := strings.TrimSpace(expectedRegexPattern) == ""
 	regexPattern := ""
-	if expectedRegex != nil {
-		regexPattern = expectedRegex.String()
+	if strings.TrimSpace(expectedRegexPattern) != "" {
+		regexPattern = expectedRegexPattern
 		if parsed, err := strconv.ParseFloat(regexPattern, 64); err == nil {
 			showSimilarity = true
 			if expectedSimilarity == 0 {

@@ -127,7 +127,7 @@ func validatePrerequisiteExpectedOutputs(s *Scenario) []ValidationIssue {
 				continue
 			}
 			hasLiteral := strings.TrimSpace(block.ExpectedOutput.Content) != ""
-			if !hasLiteral && block.ExpectedOutput.ExpectedRegex == nil {
+			if !hasLiteral && strings.TrimSpace(block.ExpectedOutput.ExpectedRegexPattern) == "" {
 				issues = append(issues, ValidationIssue{
 					Severity: ValidationSeverityError,
 					Message:  fmt.Sprintf("Prerequisite command %q #%d must include an expected_results block to verify success.", step.Name, idx+1),

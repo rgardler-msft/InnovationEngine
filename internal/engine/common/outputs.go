@@ -2,7 +2,9 @@ package common
 
 import (
 	"fmt"
+	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/Azure/InnovationEngine/internal/lib"
@@ -16,19 +18,31 @@ func CompareCommandOutputs(
 	actualOutput string,
 	expectedOutput string,
 	expectedSimilarity float64,
-	expectedRegex *regexp.Regexp,
+	expectedRegexPattern string,
 	expectedOutputLanguage string,
 ) (float64, error) {
 	actualNormalized := normalizeOutput(actualOutput)
 	expectedNormalized := normalizeOutput(expectedOutput)
 
-	if expectedRegex != nil {
-		if !expectedRegex.MatchString(actualNormalized) {
+	if strings.TrimSpace(expectedRegexPattern) != "" {
+		expandedPattern, compiledRegex, usedEnvValues, err := compileRegexWithEnv(expectedRegexPattern)
+		if err != nil {
+			return 0.0, err
+		}
+
+		if !compiledRegex.MatchString(actualNormalized) {
+			patternDisplay := strings.TrimSpace(expectedRegexPattern)
+			if patternDisplay == "" {
+				patternDisplay = expandedPattern
+			}
+			if details := formatRegexEnvDetails(usedEnvValues); details != "" {
+				patternDisplay = fmt.Sprintf("%s\n%s", patternDisplay, details)
+			}
 			return 0.0, fmt.Errorf(
 				ui.ErrorMessageStyle.Render(
 					"Expected output does not match actual output.\nExpected Pattern:\n%s\nActual:\n%s",
 				),
-				ui.VerboseStyle.Render(expectedRegex.String()),
+				ui.VerboseStyle.Render(patternDisplay),
 				ui.VerboseStyle.Render(summarizeOutput(actualNormalized, 20)),
 			)
 		}
@@ -96,6 +110,49 @@ func normalizeOutput(value string) string {
 	return strings.ReplaceAll(value, "\r", "\n")
 }
 
+func compileRegexWithEnv(pattern string) (string, *regexp.Regexp, map[string]string, error) {
+	expanded, used := expandRegexPattern(pattern)
+	compiled, err := regexp.Compile(expanded)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("cannot compile regex %q: %w", expanded, err)
+	}
+	return expanded, compiled, used, nil
+}
+
+func expandRegexPattern(pattern string) (string, map[string]string) {
+	replacements := loadEnvironmentForRegex()
+	const literalPlaceholder = "__IE_LITERAL_DOLLAR__"
+	pattern = strings.ReplaceAll(pattern, `\$`, literalPlaceholder)
+	used := make(map[string]string)
+	expanded := os.Expand(pattern, func(key string) string {
+		if value, ok := replacements[key]; ok {
+			used[key] = value
+			return value
+		}
+		return ""
+	})
+	return strings.ReplaceAll(expanded, literalPlaceholder, "$"), used
+}
+
+func loadEnvironmentForRegex() map[string]string {
+	replacements := make(map[string]string)
+	for _, kv := range os.Environ() {
+		parts := strings.SplitN(kv, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		replacements[parts[0]] = parts[1]
+	}
+
+	if envFromState, err := lib.LoadEnvironmentStateFile(lib.DefaultEnvironmentStateFile); err == nil {
+		for k, v := range envFromState {
+			replacements[k] = v
+		}
+	}
+
+	return replacements
+}
+
 func summarizeOutput(value string, maxLines int) string {
 	trimmed := strings.TrimRight(value, "\n")
 	if trimmed == "" {
@@ -110,4 +167,20 @@ func summarizeOutput(value string, maxLines int) string {
 	summary := append([]string{}, lines[:maxLines]...)
 	summary = append(summary, fmt.Sprintf("... (%d more lines)", len(lines)-maxLines))
 	return strings.Join(summary, "\n")
+}
+
+func formatRegexEnvDetails(values map[string]string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%s", key, values[key]))
+	}
+	return fmt.Sprintf("(where %s)", strings.Join(parts, ", "))
 }

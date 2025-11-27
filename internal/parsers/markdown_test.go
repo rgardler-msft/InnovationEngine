@@ -172,14 +172,9 @@ func TestParsingMarkdownExpectedRegex(t *testing.T) {
 		}
 
 		block := codeBlocks[0].ExpectedOutput
-		if block.ExpectedRegex == nil {
-			t.Errorf("ExpectedRegex is nil")
-		}
-
-		stringRegex := block.ExpectedRegex.String()
 		expectedRegex := `Foo \w+`
-		if stringRegex != expectedRegex {
-			t.Errorf("ExpectedRegex is wrong, got %q, expected %q", stringRegex, expectedRegex)
+		if block.ExpectedRegexPattern != expectedRegex {
+			t.Errorf("ExpectedRegexPattern is wrong, got %q, expected %q", block.ExpectedRegexPattern, expectedRegex)
 		}
 	})
 }

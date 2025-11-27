@@ -175,6 +175,8 @@ The numerical similarity value is quick and easy to use, but it can be inaccurat
 
 \<!-- expected_similarity="^(Hello|Goodbye) World$" -->
 
+When you provide a quoted `expected_similarity` value, the engine treats it as a regular expression. Any environment variables referenced inside the pattern are expanded before the regex runs, and the failure message echoes both the original pattern and the concrete values (for example, `^Hello $GREETING` followed by `(where GREETING=RegEx World)`). Only exported variables (or ones loaded from `ie env-config`) participate in that expansion—shell-local assignments such as `GREETING=value` do not escape the subshell and therefore cannot show up in the expectation. See `scenarios/testing/fuzzyMatchTest.md` for end-to-end samples covering fuzzy thresholds, regexes, and env-aware comparisons.
+
 ### Environment Variables
 
 You can pass in variable declarations as an argument to the ie CLI command using the 'var' parameter. For example:
