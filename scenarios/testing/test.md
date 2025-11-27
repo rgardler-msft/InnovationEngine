@@ -13,6 +13,34 @@ This master test scenario runs all existing test documents in this folder as pre
 - [Variable hierarchy scenario](variableHierarchy.md)
 - [Variables basics](variables.md)
 
+## Steps
+
+Each of the following steps are dummy steps to allow full testing of reporting and linting tools.
+
+### Step 1: Hello
+
+This step says hello.
+
+```bash
+echo "Hello!"
+```
+
+### Step 2: Sleep
+
+Wait for a couple of seconds.
+
+```bash
+sleep 2
+```
+
+### Step 3: Goodbye
+
+This step says Goodbye.
+
+```bash
+echo "Goodbye".
+```
+
 ## Validation
 
 This final check confirms that the aggregated scenarios completed successfully.

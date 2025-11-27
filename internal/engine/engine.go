@@ -192,7 +192,7 @@ func (e *Engine) InteractWithScenario(scenario *common.Scenario) error {
 		}
 
 		switch e.Configuration.Environment {
-	case environments.EnvironmentsAzure, environments.EnvironmentsOCD:
+		case environments.EnvironmentsAzure, environments.EnvironmentsOCD:
 
 			logging.GlobalLogger.Info(
 				"Cleaning environment variable file located at /tmp/ie-env-vars",

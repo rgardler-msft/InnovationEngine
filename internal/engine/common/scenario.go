@@ -119,7 +119,8 @@ func (ctx *prerequisiteInjectionContext) processPrerequisite(
 	afterPrereqs = stripTextFromFirstDescription(afterPrereqs, ctx.prerequisiteSectionText)
 
 	markerFile := ctx.markerFile(prereqTitle)
-	newPrereqBlocks := ctx.buildPrerequisiteExecutionBlocks(markerFile, prereqDisplay, verificationBlocks, bodyBlocks)
+	sourceName := filepath.Base(resolvedURL)
+	newPrereqBlocks := ctx.buildPrerequisiteExecutionBlocks(markerFile, prereqDisplay, sourceName, verificationBlocks, bodyBlocks)
 
 	updated := append([]parsers.CodeBlock{}, beforePrereqs...)
 	updated = append(updated, newPrereqBlocks...)
@@ -209,18 +210,19 @@ func splitScenarioBlocks(blocks []parsers.CodeBlock) (beforePrereqs, afterPrereq
 func (ctx *prerequisiteInjectionContext) buildPrerequisiteExecutionBlocks(
 	markerFile string,
 	display string,
+	source string,
 	verificationBlocks []parsers.CodeBlock,
 	bodyBlocks []parsers.CodeBlock,
 ) []parsers.CodeBlock {
 	hasVerification := len(verificationBlocks) > 0
-	blocks := []parsers.CodeBlock{ctx.buildValidationBanner(markerFile, display, hasVerification)}
-	blocks = append(blocks, ctx.buildVerificationBlocks(markerFile, display, verificationBlocks)...)
-	blocks = append(blocks, ctx.buildDecisionBanner(markerFile, display, hasVerification))
-	blocks = append(blocks, wrapPrerequisiteBodyBlocks(markerFile, display, bodyBlocks, hasVerification)...)
+	blocks := []parsers.CodeBlock{ctx.buildValidationBanner(markerFile, display, source, hasVerification)}
+	blocks = append(blocks, ctx.buildVerificationBlocks(markerFile, display, source, verificationBlocks)...)
+	blocks = append(blocks, ctx.buildDecisionBanner(markerFile, display, source, hasVerification))
+	blocks = append(blocks, wrapPrerequisiteBodyBlocks(markerFile, display, source, bodyBlocks, hasVerification)...)
 	return blocks
 }
 
-func (ctx *prerequisiteInjectionContext) buildValidationBanner(markerFile, display string, hasVerification bool) parsers.CodeBlock {
+func (ctx *prerequisiteInjectionContext) buildValidationBanner(markerFile, display, source string, hasVerification bool) parsers.CodeBlock {
 	cleanup := ""
 	if !hasVerification {
 		cleanup = fmt.Sprintf("rm -f \"%s\"\n", markerFile)
@@ -228,8 +230,9 @@ func (ctx *prerequisiteInjectionContext) buildValidationBanner(markerFile, displ
 	banner := parsers.CodeBlock{
 		Language:              "bash",
 		Header:                "Prerequisites",
-		Content:               fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\n%secho \"Validating Prerequisite: %s\"\n", markerFile, display, cleanup, display),
+		Content:               fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\" source=\"%s\"\n%secho \"Validating Prerequisite: %s\"\n", markerFile, display, source, cleanup, display),
 		InPrerequisiteSection: true,
+		Section:               "Prerequisites",
 	}
 
 	if !*ctx.prerequisiteSectionUsed && strings.TrimSpace(ctx.prerequisiteSectionText) != "" {
@@ -240,13 +243,15 @@ func (ctx *prerequisiteInjectionContext) buildValidationBanner(markerFile, displ
 	return banner
 }
 
-func (ctx *prerequisiteInjectionContext) buildVerificationBlocks(markerFile, display string, verificationBlocks []parsers.CodeBlock) []parsers.CodeBlock {
+func (ctx *prerequisiteInjectionContext) buildVerificationBlocks(markerFile, display, source string, verificationBlocks []parsers.CodeBlock) []parsers.CodeBlock {
 	annotated := make([]parsers.CodeBlock, 0, len(verificationBlocks))
 	for i, block := range verificationBlocks {
 		updated := block
 		updated.InPrerequisiteSection = true
-		metadata := fmt.Sprintf("# ie:auto-prereq-verification marker=\"%s\" display=\"%s\" index=\"%d\" total=\"%d\"\n", markerFile, display, i+1, len(verificationBlocks))
+		sectionAttr := formatAutoPrereqSectionAttribute(block.Section)
+		metadata := fmt.Sprintf("# ie:auto-prereq-verification marker=\"%s\" display=\"%s\" source=\"%s\" index=\"%d\" total=\"%d\"%s\n", markerFile, display, source, i+1, len(verificationBlocks), sectionAttr)
 		updated.Content = metadata + block.Content
+		updated.Section = "Prerequisites"
 		originalHeader := updated.Header
 		updated.Header = "Prerequisites"
 		if originalHeader != "" && !strings.EqualFold(originalHeader, "Prerequisites") {
@@ -261,8 +266,8 @@ func (ctx *prerequisiteInjectionContext) buildVerificationBlocks(markerFile, dis
 	return annotated
 }
 
-func (ctx *prerequisiteInjectionContext) buildDecisionBanner(markerFile, display string, hasVerification bool) parsers.CodeBlock {
-	content := fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\"\n", markerFile, display)
+func (ctx *prerequisiteInjectionContext) buildDecisionBanner(markerFile, display, source string, hasVerification bool) parsers.CodeBlock {
+	content := fmt.Sprintf("# ie:auto-prereq-banner marker=\"%s\" display=\"%s\" source=\"%s\"\n", markerFile, display, source)
 	if hasVerification {
 		content += fmt.Sprintf("if [ -f \"%s\" ]; then echo \"Skipping Prerequisite: %s (verification passed)\"; else echo \"Executing Prerequisite: %s\"; fi\n", markerFile, display, display)
 	} else {
@@ -273,21 +278,24 @@ func (ctx *prerequisiteInjectionContext) buildDecisionBanner(markerFile, display
 		Header:                "Prerequisites",
 		Content:               content,
 		InPrerequisiteSection: true,
+		Section:               "Prerequisites",
 	}
 }
 
-func wrapPrerequisiteBodyBlocks(markerFile, display string, bodyBlocks []parsers.CodeBlock, hasVerification bool) []parsers.CodeBlock {
+func wrapPrerequisiteBodyBlocks(markerFile, display, source string, bodyBlocks []parsers.CodeBlock, hasVerification bool) []parsers.CodeBlock {
 	wrapped := make([]parsers.CodeBlock, 0, len(bodyBlocks))
 	for i := range bodyBlocks {
+		sectionAttr := formatAutoPrereqSectionAttribute(bodyBlocks[i].Section)
 		bodyContent := bodyBlocks[i].Content
 		if hasVerification {
 			bodyContent = fmt.Sprintf("if [ ! -f \"%s\" ]; then\n%s\nfi", markerFile, bodyBlocks[i].Content)
 		}
-		content := fmt.Sprintf("# ie:auto-prereq-body marker=\"%s\" display=\"%s\"\n%s\n", markerFile, display, bodyContent)
+		content := fmt.Sprintf("# ie:auto-prereq-body marker=\"%s\" display=\"%s\" source=\"%s\"%s\n%s\n", markerFile, display, source, sectionAttr, bodyContent)
 		bodyBlocks[i].Content = content
 		originalHeader := bodyBlocks[i].Header
 		bodyBlocks[i].Header = "Prerequisites"
 		bodyBlocks[i].InPrerequisiteSection = true
+		bodyBlocks[i].Section = "Prerequisites"
 		if originalHeader != "" && !strings.EqualFold(originalHeader, "Prerequisites") {
 			if strings.TrimSpace(bodyBlocks[i].Description) != "" {
 				bodyBlocks[i].Description = fmt.Sprintf("%s\n\n%s", originalHeader, bodyBlocks[i].Description)
@@ -306,6 +314,16 @@ func (ctx *prerequisiteInjectionContext) markerFile(prereqTitle string) string {
 	return fmt.Sprintf("/tmp/prereq_%s_skip", slug)
 }
 
+func formatAutoPrereqSectionAttribute(section string) string {
+	trimmed := strings.TrimSpace(section)
+	if trimmed == "" || strings.EqualFold(trimmed, "Prerequisites") {
+		return ""
+	}
+	sanitized := strings.ReplaceAll(trimmed, "\"", "'")
+	sanitized = strings.ReplaceAll(sanitized, "\n", " ")
+	return fmt.Sprintf(" section=\"%s\"", sanitized)
+}
+
 func isRemotePath(path string) bool {
 	return strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://")
 }
@@ -314,6 +332,7 @@ func isRemotePath(path string) bool {
 type Step struct {
 	Name       string
 	CodeBlocks []parsers.CodeBlock
+	Section    string
 }
 
 // Scenarios are the top-level object that represents a scenario to be executed.
@@ -341,11 +360,15 @@ func groupCodeBlocksIntoSteps(blocks []parsers.CodeBlock) []Step {
 	for _, block := range blocks {
 		if index, ok := headerIndex[block.Header]; ok {
 			groupedSteps[index].CodeBlocks = append(groupedSteps[index].CodeBlocks, block)
+			if groupedSteps[index].Section == "" {
+				groupedSteps[index].Section = block.Section
+			}
 		} else {
 			headerIndex[block.Header] = len(groupedSteps)
 			groupedSteps = append(groupedSteps, Step{
 				Name:       block.Header,
 				CodeBlocks: []parsers.CodeBlock{block},
+				Section:    block.Section,
 			})
 		}
 	}

@@ -57,6 +57,7 @@ type CodeBlock struct {
 	Description           string              `json:"description"`
 	ExpectedOutput        ExpectedOutputBlock `json:"resultBlock"`
 	InPrerequisiteSection bool                `json:"inPrerequisiteSection"`
+	Section               string              `json:"section"`
 }
 
 // Assumes the title of the scenario is the first h1 header in the
@@ -103,6 +104,7 @@ func ExtractCodeBlocksFromAst(
 	var lastNode ast.Node
 	var currentParagraphs string
 	var inPrerequisitesSection bool
+	var currentSection string
 
 	if sourceName == "" {
 		sourceName = "<unknown source>"
@@ -121,6 +123,7 @@ func ExtractCodeBlocksFromAst(
 					} else {
 						inPrerequisitesSection = false
 					}
+					currentSection = headingText
 				}
 				lastNode = node
 			case *ast.Paragraph:
@@ -189,6 +192,7 @@ func ExtractCodeBlocksFromAst(
 							Header:                lastHeader,
 							Description:           description,
 							InPrerequisiteSection: inPrerequisitesSection,
+							Section:               currentSection,
 						}
 						commands = append(commands, command)
 						break
