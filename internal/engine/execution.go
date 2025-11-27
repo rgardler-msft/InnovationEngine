@@ -742,7 +742,7 @@ func printExecutionSummary(stepTimings []stepTiming) {
 	}
 	fmt.Println("  sections:")
 	for _, section := range sections {
-		fmt.Printf("    - name: %q\n", section.Name)
+		fmt.Printf("    - title: %q\n", section.Name)
 		fmt.Printf("      duration: \"%s\"\n", formatElapsed(section.Duration))
 		if len(section.Children) == 0 {
 			continue
